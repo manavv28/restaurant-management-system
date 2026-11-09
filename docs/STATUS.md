@@ -41,3 +41,7 @@ External/deferred:
 
 ## Selected hosting target
 Supabase PostgreSQL + Cloud Run FastAPI + Vercel frontend. Deployment scripts and a separate scheduled-job configuration are available in SUPABASE_CLOUD_RUN.md. Local container/PostgreSQL validation passed; actual hosting and database cutover await Google Cloud project setup and secure credentials. Existing Render resources remain unchanged.
+
+## Current hosting decision
+Keep the existing Render Free backend and use Supabase Free for PostgreSQL; do not provision Google Cloud resources. render.yaml now requests a manually supplied DATABASE_URL instead of a Render database reference. The legacy Render database definition is retained to protect existing data until a verified transfer/cutover.
+See RENDER_SUPABASE.md. No real credentials were available, no live transfer was attempted, and no existing hosting resources were modified.

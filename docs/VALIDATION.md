@@ -41,3 +41,10 @@
 - Both deployment helper shell scripts passed bash syntax checks.
 - Google Cloud deployment/build/scheduler commands have not been run against a real project. No Google Cloud identity is connected and a billing-enabled project has not been provided.
 - Live Supabase connectivity/TLS, data transfer from Render, Cloud Run deployment, Scheduler invocation and Vercel cutover remain unverified. The existing Render service/database were not modified.
+
+## Render → Supabase preparation
+- Existing 26 backend tests passed.
+- transfer_postgres was exercised against two isolated PostgreSQL 16 databases with fixture accounts, menus and favourites.
+- Audit mode copied no rows. Copy mode preserved IDs, password hashes, foreign keys and row hashes; generated ID sequences advanced correctly.
+- A second transfer into a nonempty destination was refused; the source remained unchanged.
+- Validation used fixtures only. Live Render/Supabase data, credentials and connectivity were not available.

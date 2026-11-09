@@ -13,10 +13,9 @@ services:
         value: production
       - key: JWT_SECRET
         generateValue: true
+      # Enter the Supabase session-pooler URL securely in Render.
       - key: DATABASE_URL
-        fromDatabase:
-          name: biteai-demo-db
-          property: connectionString
+        sync: false
       - key: CATALOG_WORKER_ENABLED
         value: "true"
       - key: SEED_SAMPLE_DATA
@@ -24,6 +23,8 @@ services:
       - key: ENABLE_PAYMENT_SIMULATION
         value: "true"
 
+# Retained only to protect the existing Render database during migration.
+# Do not delete it until Supabase has been verified and existing data transferred.
 databases:
   - name: biteai-demo-db
     plan: free

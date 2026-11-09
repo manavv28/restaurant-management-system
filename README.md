@@ -4,6 +4,10 @@ A working development MVP with Next.js/TypeScript/Tailwind, Python/FastAPI, rela
 
 **Data honesty:** included restaurants and menus are fictional samples, clearly labelled. There is no complete Mumbai dataset, independently verified menu pricing, live ordering, or live payment integration. Owner supplied records remain unverified. No external API success is simulated.
 
+## Current free hosting choice: Render + Supabase
+
+Keep the existing Render Free backend and use Supabase Free for PostgreSQL. See [safe database cutover](docs/RENDER_SUPABASE.md). This does not require Google Cloud billing; database credentials must be entered securely in Render settings. Existing data must be transferred before switching.
+
 ## Supabase database + Google Cloud Run backend
 
 See [Supabase / Cloud Run deployment](docs/SUPABASE_CLOUD_RUN.md). This keeps Vercel as the frontend and runs collection as scheduled Cloud Run Jobs. Cloud credentials and a project with billing are required; these services are not deployed automatically by editing this repository.

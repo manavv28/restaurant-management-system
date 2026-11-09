@@ -1,4 +1,6 @@
-# Deploy the sample app on Render
+# Initial Render demo (historical)
+
+**For the current Render + Supabase configuration, use [RENDER_SUPABASE.md](RENDER_SUPABASE.md).** The instructions below describe the original auto-created Render database setup.
 
 The root render.yaml provisions one Docker web service containing Next.js and FastAPI, plus a managed PostgreSQL database. Both use the free plan. This is a fictional sample-data demo; simulation is enabled and never counts as verified spending. No paid resource is requested by this blueprint. Review Render's current free-plan limits, database expiry and availability in the confirmation screen. Do not accept an automatic paid upgrade unless you want its cost.
 
