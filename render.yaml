@@ -1,0 +1,30 @@
+# Sample-data deployment. Review Render's current free-plan limits before launching.
+services:
+  - type: web
+    name: biteai-demo
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: biteai-demo-db
+          property: connectionString
+      - key: SEED_SAMPLE_DATA
+        value: "true"
+      - key: ENABLE_PAYMENT_SIMULATION
+        value: "true"
+
+databases:
+  - name: biteai-demo-db
+    plan: free
+    region: singapore
+    databaseName: biteai
+    user: biteai
