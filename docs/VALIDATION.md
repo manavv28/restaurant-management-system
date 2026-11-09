@@ -48,3 +48,6 @@
 - Audit mode copied no rows. Copy mode preserved IDs, password hashes, foreign keys and row hashes; generated ID sequences advanced correctly.
 - A second transfer into a nonempty destination was refused; the source remained unchanged.
 - Validation used fixtures only. Live Render/Supabase data, credentials and connectivity were not available.
+
+## Supabase certificate troubleshooting
+A live Render screenshot reported certificate verification failure with the system CA bundle. Supabase's official SSL documentation requires its downloaded database CA for verify-full. RENDER_SUPABASE.md now uses a Render secret-file mount at /etc/secrets/supabase-ca.crt. The live certificate upload and reconnection remain user actions and have not been verified here. Certificate/hostname verification remains enabled.
