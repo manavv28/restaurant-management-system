@@ -7,14 +7,13 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 URL = os.getenv('DATABASE_URL', 'sqlite:///./biteai.sqlite')
-# Render uses postgres://; SQLAlchemy's psycopg driver requires its explicit dialect.
-if URL.startswith('postgres://'):
-    URL = URL.replace('postgres://', 'postgresql+psycopg://', 1)
-elif URL.startswith('postgresql://'):
-    URL = URL.replace('postgresql://', 'postgresql+psycopg://', 1)
-engine = create_engine(URL, connect_args={'check_same_thread': False} if URL.startswith('sqlite') else {},
-                       pool_pre_ping=True, **({} if URL.startswith('sqlite') else {'pool_size':3,'max_overflow':1,'pool_recycle':300}))
-if URL.startswith('sqlite'):
+from .database_tls import connection_url
+database_url = connection_url(URL)
+is_sqlite = database_url.get_backend_name()=='sqlite'
+engine = create_engine(database_url, connect_args={'check_same_thread': False} if is_sqlite else {},
+                       pool_pre_ping=True, hide_parameters=True,
+                       **({} if is_sqlite else {'pool_size':3,'max_overflow':1,'pool_recycle':300}))
+if is_sqlite:
     @event.listens_for(engine, 'connect')
     def sqlite_constraints(connection, _):
         connection.execute('PRAGMA foreign_keys=ON')

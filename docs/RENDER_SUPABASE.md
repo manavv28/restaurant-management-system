@@ -10,16 +10,15 @@ In your existing Supabase project open SQL Editor. On a fresh application schema
 - supabase/migrations/002_catalog_agents.sql
 
 These create application tables, indexes and RLS restrictions. If BiteAI tables already exist, do not drop them to make migration pass. Inspect the existing schema first.
-Open Connect → Session pooler and copy the PostgreSQL connection string on port 5432. Use the database password, not a Supabase anon/service-role API key. URL-encode special password characters.
-For verify-full, download the Supabase CA certificate from Database → Settings → SSL Configuration (https://supabase.com/dashboard/project/_/database/settings).
-In Render's Environment page, add a Secret File named supabase-ca.crt. Paste the full downloaded PEM certificate, including BEGIN/END CERTIFICATE lines; it is CA material, not the database password. Docker services expose it at /etc/secrets/supabase-ca.crt.
-Append this query to the database URL:
-    ?sslmode=verify-full&sslrootcert=/etc/secrets/supabase-ca.crt
-Use & rather than ? if the copied URL already has query parameters; replace any old sslrootcert value instead of adding it twice.
-The system CA bundle alone may not trust the Supabase database CA. Do not change sslmode to require/disable or bypass certificate checks to make startup pass.
-For the local transfer tool, use the path to the downloaded certificate on the machine running the transfer; /etc/secrets applies only to Render.
+Open Connect → Session pooler and copy the PostgreSQL connection string on port 5432. Use the database password, not a Supabase anon/service-role API key. URL-encode special password characters. The updated Docker image downloads and bundles Supabase's official public CA over verified HTTPS during its build, alongside the system trust roots. It validates the certificate before shipping the image.
+No dashboard Secret File upload is needed. Use:
+    ?sslmode=verify-full
+If you already configured sslrootcert=/etc/secrets/supabase-ca.crt and that file is missing, the application automatically uses the image's bundle instead. The earlier system-bundle path also maps to the combined trust bundle. Existing explicitly uploaded certificates are honoured.
+Certificate and hostname verification remain enabled. This does not replace the password or change the database hostname.
+For local tooling or an explicitly configured custom CA file, use the downloaded certificate's real local path. Do not disable certificate checks to work around missing files.
 
-Official source: https://supabase.com/docs/guides/platform/ssl-enforcement
+Official certificate source and provenance: backend/app/certs/README.md
+Official guidance: https://supabase.com/docs/guides/platform/ssl-enforcement
 
 ## 2. Preserve existing Render data BEFORE switching DATABASE_URL
 Do not assume an empty Supabase database contains existing accounts, saved restaurants or campaigns.

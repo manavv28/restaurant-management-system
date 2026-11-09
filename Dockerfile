@@ -9,12 +9,14 @@ ENV API_INTERNAL_URL=http://127.0.0.1:8000
 RUN npm run build
 
 FROM python:3.12-slim-bookworm AS runtime
-RUN --mount=type=secret,id=system_ca     apt-get update && apt-get install -y --no-install-recommends libstdc++6 ca-certificates &&     rm -rf /var/lib/apt/lists/*
+RUN --mount=type=secret,id=system_ca     apt-get update && apt-get install -y --no-install-recommends libstdc++6 ca-certificates openssl &&     rm -rf /var/lib/apt/lists/*
 COPY --from=frontend /usr/local/bin/node /usr/local/bin/node
 WORKDIR /app
 COPY backend/requirements.txt ./backend/requirements.txt
 RUN --mount=type=secret,id=system_ca     if [ -f /run/secrets/system_ca ]; then export PIP_CERT=/run/secrets/system_ca; fi;     pip install --no-cache-dir -r backend/requirements.txt
 COPY backend/app ./backend/app
+ARG DATABASE_CA_SOURCE=official
+RUN --mount=type=secret,id=system_ca --mount=type=secret,id=supabase_ca if [ -f /run/secrets/system_ca ]; then export SSL_CERT_FILE=/run/secrets/system_ca; fi; if [ "$DATABASE_CA_SOURCE" = official ]; then PYTHONPATH=/app/backend python -m app.build_database_ca; elif [ "$DATABASE_CA_SOURCE" = operator ]; then PYTHONPATH=/app/backend python -m app.build_database_ca --certificate-file /run/secrets/supabase_ca; else exit 1; fi
 COPY --from=frontend /build/frontend/.next/standalone ./frontend
 COPY --from=frontend /build/frontend/.next/static ./frontend/.next/static
 COPY scripts/production.py ./scripts/production.py

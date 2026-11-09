@@ -51,3 +51,13 @@
 
 ## Supabase certificate troubleshooting
 A live Render screenshot reported certificate verification failure with the system CA bundle. Supabase's official SSL documentation requires its downloaded database CA for verify-full. RENDER_SUPABASE.md now uses a Render secret-file mount at /etc/secrets/supabase-ca.crt. The live certificate upload and reconnection remain user actions and have not been verified here. Certificate/hostname verification remains enabled.
+
+## Missing Supabase certificate file fix
+- The reported failure was a missing /etc/secrets/supabase-ca.crt, after earlier system-store certificate verification failure.
+- 36 backend tests passed. Added credential-preservation, legacy-path recovery, explicit CA, malformed/missing CA, lookalike-host and bundle-validation coverage.
+- Built the full deployment container with an explicitly labelled generated test CA. Production and fixture/operator certificate sources use separate build-cache keys.
+- Started PostgreSQL with a certificate signed by that fixture CA and a SAN matching the isolated test alias for the Supabase pooler.
+- The non-root app connected using verify-full while the old Secret File path was absent; encoded @ credentials were preserved.
+- Connections using the wrong hostname and an untrusted root store were rejected. The final image's proxied /api/health passed.
+- Official production CA URL was confirmed from the official Supabase Studio source. The workspace proxy blocks that S3 host, so the production CA bytes and a live private Supabase connection could not be tested here. Render's production build fetches that CA over verified HTTPS and validates it before installing.
+- Fixture certificates/images are local tests only; no fixture certificate is committed, included in default production build context, or deployed.

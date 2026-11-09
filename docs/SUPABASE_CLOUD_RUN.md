@@ -11,8 +11,8 @@ Cloud Run has a usage-based free allowance, not guaranteed zero cost. Builds, im
 ## 1. Store Supabase credentials securely in Google Cloud
 In Supabase click Connect, then choose the **Session pooler** PostgreSQL connection string on port 5432. Session mode supports migrations and SQLAlchemy connections. Use the database password, not the Supabase anon or service-role HTTP API key.
 URL-encode special characters in the password. Use TLS certificate verification:
-    postgresql://postgres.PROJECT_REF:URL_ENCODED_PASSWORD@YOUR_SESSION_POOLER_HOST:5432/postgres?sslmode=verify-full&sslrootcert=/etc/ssl/certs/ca-certificates.crt
-Substitute the actual host and username from Supabase; do not guess them. If the project's server certificate is not trusted by the system CA bundle, configure its official CA rather than disabling verification.
+    postgresql://postgres.PROJECT_REF:URL_ENCODED_PASSWORD@YOUR_SESSION_POOLER_HOST:5432/postgres?sslmode=verify-full
+Substitute the actual host and username from Supabase; do not guess them. The image bundles Supabase's official public CA during its build and selects that bundle automatically. No manually uploaded certificate is required.
 
 In Google Cloud Console → Secret Manager, create:
 - biteai-database-url: the complete connection string above.

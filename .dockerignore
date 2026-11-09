@@ -14,3 +14,6 @@
 **/*.log
 **/*.tsbuildinfo
 attachments
+
+backend/app/certs/supabase-bundle.pem
+backend/app/certs/supabase-bundle.json

@@ -13,3 +13,6 @@
 **/playwright-report
 **/*.log
 **/*.tsbuildinfo
+
+backend/app/certs/supabase-bundle.pem
+backend/app/certs/supabase-bundle.json
