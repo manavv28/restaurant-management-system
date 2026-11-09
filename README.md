@@ -35,6 +35,10 @@ With both services running:
 
 If Chromium is unavailable, install Playwright Chromium and set CHROMIUM_PATH to its executable. Browser tests create explicitly named test accounts/listings in the running development database; run against an isolated test instance for a clean demo. Do not run them against production.
 
+## Automated real-data collection
+
+See [catalog agents](docs/CATALOG_AGENTS.md). The durable worker discovers community restaurant records and extracts prices from approved restaurant websites, with evidence, expiry and retries. Coverage is measured in the UI; no complete Mumbai dataset is claimed. The updated Render blueprint enables CATALOG_WORKER_ENABLED; existing deployments must set it explicitly. [Verified payment adapter](docs/PAYMENTS.md) requires provider and merchant onboarding before any live use.
+
 ## Configuration
 See [.env.example](.env.example). No API keys are needed for local sample mode. Without a stable JWT_SECRET, restarting the backend signs everyone out.
 

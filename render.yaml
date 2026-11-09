@@ -17,6 +17,8 @@ services:
         fromDatabase:
           name: biteai-demo-db
           property: connectionString
+      - key: CATALOG_WORKER_ENABLED
+        value: "true"
       - key: SEED_SAMPLE_DATA
         value: "true"
       - key: ENABLE_PAYMENT_SIMULATION

@@ -36,6 +36,8 @@ try:
         except (URLError,TimeoutError): pass
         if time.monotonic()>deadline: raise RuntimeError('Backend readiness timed out')
         time.sleep(.5)
+    if os.getenv('CATALOG_WORKER_ENABLED','false').lower()=='true':
+        children.append(subprocess.Popen([sys.executable,'-m','app.catalog_worker','--seed-osm','--loop'],cwd=ROOT/'backend',start_new_session=True))
     env={**os.environ,'HOSTNAME':'0.0.0.0','PORT':os.getenv('PORT','10000')}
     children.append(subprocess.Popen(['node','server.js'],cwd=ROOT/'frontend',env=env,start_new_session=True))
     while all(child.poll() is None for child in children): time.sleep(.5)

@@ -64,3 +64,25 @@ test('owner onboards restaurant, manages menu and creates campaign',async({page}
  await page.getByRole('button',{name:'Create campaign',exact:true}).click();
  await expect(page.getByRole('status')).toContainText('Campaign created');
 });
+test('coverage reports real collection honestly and unknown source is rejected',async({page})=>{
+ await page.goto('/');
+ await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
+ await expect(page.getByText('No successful automated collection yet. Sample data is not real coverage.')).toBeVisible();
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();
+ await page.getByRole('button',{name:'New here? Create an account'}).click();
+ await page.getByLabel('Your name').fill('Source Owner');
+ await page.getByLabel('Email',{exact:true}).fill('source'+Date.now()+'@example.test');
+ await page.getByLabel('Password',{exact:true}).fill('a-test-password-123');
+ await page.getByLabel('Account type').selectOption('owner');
+ await page.getByRole('button',{name:'Create account',exact:true}).click();
+ await expect(page.getByRole('dialog')).not.toBeVisible();
+ await page.getByRole('button',{name:'For restaurants'}).click();
+ await page.getByLabel('Restaurant name').fill('Source Fixture Kitchen');
+ await page.getByLabel('Address',{exact:true}).fill('Test fixture in Bandra Mumbai');
+ await page.getByRole('button',{name:'Create listing'}).click();
+ await page.getByLabel('Manage listing').selectOption({label:'Source Fixture Kitchen'});
+ await page.getByLabel('Menu page (HTTPS)').fill('https://unapproved.example.test/menu');
+ await page.getByLabel('Permission to collect this page').fill('I own this test fixture website');
+ await page.getByRole('button',{name:'Register source & queue collection'}).click();
+ await expect(page.getByText('Menu host must be explicitly listed in APPROVED_MENU_HOSTS',{exact:true})).toBeVisible();
+});

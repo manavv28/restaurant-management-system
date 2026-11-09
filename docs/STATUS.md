@@ -1,4 +1,19 @@
-# MVP delivery status
+# Current development status
+
+The original demo status below describes the first release. This update adds:
+- Durable collection jobs, retries, crash recovery and an optional supervised worker.
+- OpenStreetMap discovery and deduplication with source attribution.
+- Approved-source menu extraction using Schema.org and optional evidence-checked Gemini extraction.
+- Price evidence/expiry, stale-price exclusion, price-change audit and stored search-match snapshots.
+- Coverage and unknown-price UI, owner source registration and job inspection.
+- Razorpay order/signature/capture adapter, disabled until credentials and merchant onboarding.
+
+Validation: 23 backend tests, four browser journeys, frontend build. Provider responses in tests are fixtures.
+A real discovery attempt was blocked by the workspace proxy and recorded as a retry. No live Mumbai dataset has been populated here. Gemini and Google Places keys are absent. Collection still needs network access and approved website sources.
+Live payment checkout UI, settlement/routing, refunds and provider/merchant approval remain incomplete. No live funds were moved.
+No new production deployment has been performed during this update.
+
+## Original demo baseline (historical)
 
 Implemented locally:
 - Next.js responsive consumer search/list/map/menu experience and browser voice adapter (text fallback).

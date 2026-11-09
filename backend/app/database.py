@@ -140,3 +140,63 @@ class Preference(Base):
     __tablename__ = 'preferences'
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), primary_key=True)
     preferred_cuisine: Mapped[str] = mapped_column(String(100), default='')
+
+class CatalogSource(Base):
+    __tablename__ = 'catalog_sources'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    kind: Mapped[str] = mapped_column(String(30))  # osm or approved_menu
+    url: Mapped[str] = mapped_column(Text)
+    restaurant_id: Mapped[int | None] = mapped_column(ForeignKey('restaurants.id'), nullable=True)
+    area: Mapped[str] = mapped_column(String(80))
+    permission_note: Mapped[str] = mapped_column(Text)
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    refresh_hours: Mapped[int] = mapped_column(Integer, default=24)
+    checked_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+class CatalogJob(Base):
+    __tablename__ = 'catalog_jobs'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey('catalog_sources.id'), index=True)
+    state: Mapped[str] = mapped_column(String(20), default='queued', index=True)
+    attempts: Mapped[int] = mapped_column(Integer, default=0)
+    available_at: Mapped[str] = mapped_column(String(40), default=now)
+    started_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    finished_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    trace: Mapped[str] = mapped_column(Text, default='[]')
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+class MenuEvidence(Base):
+    __tablename__ = 'menu_evidence'
+    menu_item_id: Mapped[int] = mapped_column(ForeignKey('menu_items.id'), primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey('catalog_sources.id'))
+    excerpt: Mapped[str] = mapped_column(Text)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    method: Mapped[str] = mapped_column(String(40))
+    fetched_at: Mapped[str] = mapped_column(String(40))
+    expires_at: Mapped[str] = mapped_column(String(40), index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+
+class SearchMatch(Base):
+    __tablename__ = 'search_matches'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    search_id: Mapped[int] = mapped_column(ForeignKey('searches.id', ondelete='CASCADE'), index=True)
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'))
+    menu_item_id: Mapped[int] = mapped_column(ForeignKey('menu_items.id'))
+    price_paise: Mapped[int] = mapped_column(Integer)
+    distance_km: Mapped[float] = mapped_column(Float)
+    source: Mapped[str] = mapped_column(Text)
+
+class PaymentOrder(Base):
+    __tablename__ = 'payment_orders'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    provider_order_id: Mapped[str] = mapped_column(String(100), unique=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'))
+    amount_paise: Mapped[int] = mapped_column(Integer)
+    state: Mapped[str] = mapped_column(String(20), default='created')
+    created_at: Mapped[str] = mapped_column(String(40), default=now)
+
+from sqlalchemy import Index, text
+Index('catalog_one_active_job_per_source', CatalogJob.source_id, unique=True,
+      sqlite_where=text("state IN ('queued', 'running')"),
+      postgresql_where=text("state IN ('queued', 'running')"))

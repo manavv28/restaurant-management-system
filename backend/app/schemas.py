@@ -66,3 +66,8 @@ class IngestionInput(BaseModel):
 class ProfileInput(BaseModel):
     name: str = Field(min_length=1,max_length=80)
     preferred_cuisine: Literal['','Chinese','Indian','Italian','Japanese','Mexican','South Indian'] = ''
+
+class MenuSourceInput(BaseModel):
+    url: str = Field(max_length=1000)
+    permission_note: str = Field(min_length=10,max_length=500)
+    refresh_hours: int = Field(default=24,ge=6,le=168)
