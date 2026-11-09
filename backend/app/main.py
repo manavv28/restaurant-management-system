@@ -14,7 +14,11 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app):
-    Base.metadata.create_all(engine)
+    if os.getenv('AUTO_CREATE_SCHEMA','true').lower()=='true':
+        Base.metadata.create_all(engine)
+    else:
+        # Fail startup before accepting traffic if the migration job has not run.
+        with Session() as db:db.execute(select(Restaurant.id).limit(1))
     if os.getenv('SEED_SAMPLE_DATA','true').lower() == 'true':
         with Session() as db: seed(db)
     yield

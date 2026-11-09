@@ -1,0 +1,13 @@
+# syntax=docker/dockerfile:1
+FROM python:3.12-slim-bookworm
+ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 APP_ENV=production AUTO_CREATE_SCHEMA=false SEED_SAMPLE_DATA=false ENABLE_PAYMENT_SIMULATION=false
+WORKDIR /app
+COPY backend/requirements.txt ./requirements.txt
+RUN --mount=type=secret,id=system_ca     if [ -f /run/secrets/system_ca ]; then export PIP_CERT=/run/secrets/system_ca; fi;     pip install --no-cache-dir -r requirements.txt
+COPY backend/app ./app
+COPY supabase/migrations ./migrations
+RUN useradd --uid 10001 --create-home biteai && chown -R biteai:biteai /app
+USER biteai
+EXPOSE 8080
+ENTRYPOINT ["python", "-m", "app.cloud_run"]
+CMD ["serve"]

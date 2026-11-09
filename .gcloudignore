@@ -1,0 +1,15 @@
+.gcloudignore
+.git
+.venv
+.env
+.env.*
+!.env.example
+**/*.sqlite
+**/*.sqlite-*
+**/node_modules
+**/.next
+**/__pycache__
+**/test-results
+**/playwright-report
+**/*.log
+**/*.tsbuildinfo

@@ -4,6 +4,10 @@ A working development MVP with Next.js/TypeScript/Tailwind, Python/FastAPI, rela
 
 **Data honesty:** included restaurants and menus are fictional samples, clearly labelled. There is no complete Mumbai dataset, independently verified menu pricing, live ordering, or live payment integration. Owner supplied records remain unverified. No external API success is simulated.
 
+## Supabase database + Google Cloud Run backend
+
+See [Supabase / Cloud Run deployment](docs/SUPABASE_CLOUD_RUN.md). This keeps Vercel as the frontend and runs collection as scheduled Cloud Run Jobs. Cloud credentials and a project with billing are required; these services are not deployed automatically by editing this repository.
+
 ## Deploy the sample app
 
 See [Render deployment](docs/RENDER.md) for a single-account Blueprint with a web app and managed PostgreSQL. The root Dockerfile packages both services. No paid plan is requested; review current Render free-tier limits before launching.

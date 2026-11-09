@@ -38,3 +38,6 @@ External/deferred:
 - Payment gateway signature adapter, real settlement and live financial data integrations are not implemented.
 - Analytics expose independent searches/clicks, not a misleading attributed conversion rate; attribution/funnels require additional event modelling.
 - Hosting/public deployment, Supabase live migration and production security hardening have not been performed.
+
+## Selected hosting target
+Supabase PostgreSQL + Cloud Run FastAPI + Vercel frontend. Deployment scripts and a separate scheduled-job configuration are available in SUPABASE_CLOUD_RUN.md. Local container/PostgreSQL validation passed; actual hosting and database cutover await Google Cloud project setup and secure credentials. Existing Render resources remain unchanged.

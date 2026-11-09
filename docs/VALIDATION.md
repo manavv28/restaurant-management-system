@@ -32,3 +32,12 @@
 - The production container built successfully with the new code.
 - Applied migrations 001 and 002 to a fresh PostgreSQL 16 database with ON_ERROR_STOP enabled; both passed.
 - Started the production supervisor with CATALOG_WORKER_ENABLED=true. API/database health passed, coverage reported five registered discovery sources and zero successfully collected real listings.
+
+## Supabase / Cloud Run configuration
+- 26 backend tests passed, including production refusal of SQLite, pre-migration startup failure and bounded collection runs.
+- Backend-only Cloud Run image built successfully.
+- Migration runner applied 001 and 002 to PostgreSQL 16, then ran again successfully without reapplying them.
+- The image served /health and /search on PORT 8080 against that database with sample creation disabled.
+- Both deployment helper shell scripts passed bash syntax checks.
+- Google Cloud deployment/build/scheduler commands have not been run against a real project. No Google Cloud identity is connected and a billing-enabled project has not been provided.
+- Live Supabase connectivity/TLS, data transfer from Render, Cloud Run deployment, Scheduler invocation and Vercel cutover remain unverified. The existing Render service/database were not modified.
