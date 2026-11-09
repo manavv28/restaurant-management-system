@@ -37,3 +37,6 @@ Run backend tests, build/typecheck, isolated Playwright journeys, then credentia
 ## Cloud network destinations
 The current cloud network denies OpenStreetMap tile requests (observed HTTP 403). Add a.tile.openstreetmap.org, b.tile.openstreetmap.org and c.tile.openstreetmap.org to the environment's existing outbound allowlist to enable the street basemap. Do not replace unrelated allowed domains. Markers remain functional and the UI reports tile failures.
 Optional provider calls also need generativelanguage.googleapis.com and places.googleapis.com when their integrations are configured. Package installation uses registry.npmjs.org, pypi.org and files.pythonhosted.org.
+
+## Source collection worker and new schema
+See CATALOG_AGENTS.md. Apply 002_catalog_agents.sql after 001 for Supabase. The backend startup creates the new tables for backend-owned databases; production migration policy should use reviewed migrations. Run the worker with the backend's database and environment. Set CATALOG_WORKER_ENABLED=true to start the collection process through the production supervisor; a separate persistent worker is preferred for reliable scheduling.

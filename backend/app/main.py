@@ -57,7 +57,7 @@ def eligibility(db,user,campaign):
 @app.get('/health')
 def health(db=Depends(db_session)):
     db.execute(select(1))
-    return {'status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local rules','google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'simulation only'}
+    return {'status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local rules','google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'signed provider webhook configured' if os.getenv('RAZORPAY_WEBHOOK_SECRET') else 'simulation only'}
 
 @app.post('/auth/register')
 def register(body:Register,db=Depends(db_session)):
@@ -111,15 +111,19 @@ async def search(body:SearchInput,user=Depends(optional_user),db=Depends(db_sess
     trace += [{'agent':'Menu intelligence','tool':'database_price_and_dish_filter','output':{'matched_dishes':len(matches)}},
               {'agent':'Recommendation','tool':'distance_price_rank','output':{'restaurants':len(unique),'preferred_cuisine':preference.preferred_cuisine if preference else None}},
               {'agent':'Discount','tool':'campaign_eligibility','output':{'authenticated':bool(user)}}]
-    db.add(Search(user_id=user.id if user else None,query=body.query,cuisine=intent.cuisine,dish=intent.dish,budget=intent.max_budget,area=area,results=len(unique),trace=json.dumps(trace)))
+    search_record=Search(user_id=user.id if user else None,query=body.query,cuisine=intent.cuisine,dish=intent.dish,budget=intent.max_budget,area=area,results=len(unique),trace=json.dumps(trace))
+    db.add(search_record);db.flush()
+    for match in unique:
+        db.add(SearchMatch(search_id=search_record.id,restaurant_id=match['restaurant']['id'],menu_item_id=match['dish']['id'],price_paise=match['dish']['price_paise'],distance_km=match['distance_km'],source=match['dish']['source']))
     db.commit()
     return {'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': 'What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None,
-            'coverage':'Limited Mumbai coverage. Sample listings are fictional; owner menus are unverified.'}
+            'coverage':'Partial Mumbai coverage; source-observed prices require confirmation. Samples are fictional.',
+            'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km), 'catalog':catalog_coverage(db)}
 
 @app.get('/restaurants/{rid}')
 def restaurant(rid:int,db=Depends(db_session)):
     r = restaurant_or_404(db,rid)
-    return {'restaurant':public(r),'menu':[public(m) for m in db.scalars(select(MenuItem).where(MenuItem.restaurant_id==rid)).all()]}
+    return {'restaurant':public(r),'menu':[menu_details(db,m) for m in db.scalars(select(MenuItem).where(MenuItem.restaurant_id==rid)).all()]}
 
 @app.post('/restaurants/{rid}/click')
 def click(rid:int,db=Depends(db_session)):
@@ -169,9 +173,8 @@ def simulate(body:TransactionInput,user=Depends(current_user),db=Depends(db_sess
     db.add(t); db.commit()
     return {**public(t),'notice':'Simulated only. Does not count toward verified spending or repeat visits.'}
 
-@app.post('/payments/webhook')
-def webhook():
-    raise HTTPException(501,'Live provider not configured. Implement provider signature verification and idempotent event processing before enabling.')
+from .payments import router as payments_router
+app.include_router(payments_router)
 
 @app.get('/me/offers')
 def offers(user=Depends(current_user),db=Depends(db_session)):
@@ -224,7 +227,10 @@ def update_menu(rid:int,mid:int,body:MenuInput,user=Depends(owner),db=Depends(db
     m=db.get(MenuItem,mid)
     if not m or m.restaurant_id != rid: raise HTTPException(404,'Menu item not found')
     for k,v in body.model_dump().items(): setattr(m,k,v)
-    m.verified_at=None; db.commit(); return public(m)
+    m.verified_at=None
+    evidence=db.get(MenuEvidence,m.id)
+    if evidence:db.delete(evidence)
+    db.commit(); return public(m)
 
 @app.post('/portal/restaurants/{rid}/campaigns')
 def campaign(rid:int,body:CampaignInput,user=Depends(owner),db=Depends(db_session)):
@@ -275,6 +281,8 @@ def ingest(rid:int,body:IngestionInput,user=Depends(owner),db=Depends(db_session
         existing=db.scalar(select(MenuItem).where(MenuItem.restaurant_id==rid,func.lower(MenuItem.name)==normalized.lower()))
         before=existing.price_paise if existing else None
         if existing:
+            evidence=db.get(MenuEvidence,existing.id)
+            if evidence:db.delete(evidence)
             for key,value in incoming.model_dump().items():setattr(existing,key,value)
             existing.name=normalized;existing.source=body.source+' (owner supplied; unverified)';existing.verified_at=None
         else:
@@ -301,3 +309,53 @@ def profile(body:ProfileInput,user=Depends(current_user),db=Depends(db_session))
     preference.preferred_cuisine=body.preferred_cuisine
     db.commit()
     return {**public(user),'preferred_cuisine':preference.preferred_cuisine}
+
+@app.get('/catalog/coverage')
+def catalog_coverage(db=Depends(db_session)):
+    real=db.scalar(select(func.count()).select_from(Restaurant).where(Restaurant.sample.is_(False))) or 0
+    samples=db.scalar(select(func.count()).select_from(Restaurant).where(Restaurant.sample.is_(True))) or 0
+    active=db.scalar(select(func.count()).select_from(MenuEvidence).where(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now())) or 0
+    sources=db.scalar(select(func.count()).select_from(CatalogSource).where(CatalogSource.enabled.is_(True))) or 0
+    last=db.scalar(select(func.max(CatalogSource.checked_at)))
+    return {'real_restaurants':real,'sample_restaurants':samples,'fresh_source_menu_items':active,'enabled_sources':sources,'last_successful_collection':last,
+            'coverage':'Partial Mumbai coverage only. Real records may have no menu or price. Community and owner data are not independently verified.',
+            'attribution':'OpenStreetMap data, when present: © OpenStreetMap contributors, ODbL'}
+
+@app.post('/portal/restaurants/{rid}/sources')
+def add_source(rid:int,body:MenuSourceInput,user=Depends(owner),db=Depends(db_session)):
+    from .catalog import approved_url
+    r=owned(db,rid,user)
+    if r.sample:raise HTTPException(422,'Cannot attach real sources to fictional samples')
+    try:approved_url(body.url)
+    except ValueError as exc:raise HTTPException(422,str(exc))
+    if db.scalar(select(CatalogSource.id).where(CatalogSource.url==body.url,CatalogSource.restaurant_id==rid)):
+        raise HTTPException(409,'Source already registered')
+    source=CatalogSource(kind='approved_menu',url=body.url,restaurant_id=rid,area=r.area,permission_note=body.permission_note,refresh_hours=body.refresh_hours)
+    db.add(source);db.flush();db.add(CatalogJob(source_id=source.id));db.commit()
+    return {'source_id':source.id,'state':'queued','message':'A separate worker collects this source; registration does not mean it was fetched.'}
+
+@app.get('/portal/restaurants/{rid}/sources')
+def source_jobs(rid:int,user=Depends(owner),db=Depends(db_session)):
+    owned(db,rid,user)
+    sources=db.scalars(select(CatalogSource).where(CatalogSource.restaurant_id==rid)).all()
+    return [{**public(s),'jobs':[public(j) for j in db.scalars(select(CatalogJob).where(CatalogJob.source_id==s.id).order_by(CatalogJob.id.desc()).limit(10))]} for s in sources]
+
+def unpriced_nearby(db,lat,lng,radius):
+    from .agents import distance_km
+    rows=db.scalars(select(Restaurant).where(Restaurant.sample.is_(False))).all()
+    output=[]
+    for restaurant in rows:
+        distance=distance_km(lat,lng,restaurant.latitude,restaurant.longitude)
+        if distance>radius:continue
+        items=db.scalars(select(MenuItem).where(MenuItem.restaurant_id==restaurant.id,MenuItem.available.is_(True))).all()
+        fresh=False
+        for item in items:
+            evidence=db.get(MenuEvidence,item.id)
+            if evidence is None or (evidence.active and evidence.expires_at>now()):fresh=True
+        if not fresh:output.append({'restaurant':public(restaurant),'distance_km':round(distance,2),'notice':'Menu price unavailable or stale. This is not a confirmed dish/budget match.'})
+    return sorted(output,key=lambda row:row['distance_km'])[:20]
+
+def menu_details(db,item):
+    evidence=db.get(MenuEvidence,item.id)
+    return {**public(item),'price_status':('fresh source observation' if evidence.active and evidence.expires_at>now() else 'stale or withdrawn source price') if evidence else 'sample' if db.get(Restaurant,item.restaurant_id).sample else 'owner supplied; unverified',
+            'source_expires_at':evidence.expires_at if evidence else None}
