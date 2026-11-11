@@ -6,9 +6,14 @@ class Register(BaseModel):
     name: str = Field(min_length=1,max_length=80)
     password: str = Field(min_length=10,max_length=128)
     role: Literal['customer','owner'] = 'customer'
+    @field_validator('name')
+    @classmethod
+    def nonblank_name(cls,value):
+        if not value.strip(): raise ValueError('Name cannot be blank')
+        return value.strip()
 class Login(BaseModel):
-    email: str
-    password: str
+    email: str = Field(max_length=254)
+    password: str = Field(max_length=128)
 class SearchInput(BaseModel):
     query: str = Field(default='',max_length=500)
     area: str = 'Bandra'
@@ -71,3 +76,6 @@ class MenuSourceInput(BaseModel):
     url: str = Field(max_length=1000)
     permission_note: str = Field(min_length=10,max_length=500)
     refresh_hours: int = Field(default=24,ge=6,le=168)
+
+class SourceState(BaseModel):
+    enabled: bool

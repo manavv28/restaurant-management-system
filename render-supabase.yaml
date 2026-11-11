@@ -1,0 +1,27 @@
+# Render Free web service with Supabase PostgreSQL.
+services:
+  - type: web
+    name: biteai-demo
+    runtime: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: JWT_SECRET
+        generateValue: true
+      # Enter the Supabase session-pooler URL securely in Render.
+      - key: DATABASE_URL
+        sync: false
+      - key: AUTO_CREATE_SCHEMA
+        value: "false"
+      - key: CATALOG_WORKER_ENABLED
+        value: "false"
+      - key: SEED_SAMPLE_DATA
+        value: "false"
+      - key: ENABLE_PAYMENT_SIMULATION
+        value: "false"
+

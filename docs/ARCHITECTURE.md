@@ -1,7 +1,7 @@
 # Architecture & trust boundaries
 
 Browser -> same-origin Next.js /api rewrite -> FastAPI -> SQLAlchemy -> SQLite (local) or PostgreSQL (Supabase).
-Custom Argon2 password authentication and expiring HS256 JWTs protect account APIs. Tokens live in sessionStorage; production should adopt secure HTTP-only cookies and CSRF protection or managed auth. Frontend does not connect directly to Supabase.
+Custom Argon2 password authentication and expiring HS256 JWTs protect account APIs. Browser sessions use HttpOnly cookies (Secure in production), a CSRF request header, and revocable hashed session IDs in PostgreSQL. API clients may use session-backed bearer tokens. Frontend does not connect directly to Supabase.
 
 ## Search workflow
 1. Structured Gemini intent extraction when configured; validated deterministic rules fallback is visibly labelled.

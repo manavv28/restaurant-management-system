@@ -200,3 +200,10 @@ from sqlalchemy import Index, text
 Index('catalog_one_active_job_per_source', CatalogJob.source_id, unique=True,
       sqlite_where=text("state IN ('queued', 'running')"),
       postgresql_where=text("state IN ('queued', 'running')"))
+
+
+class AuthSession(Base):
+    __tablename__ = 'auth_sessions'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    expires_at: Mapped[str] = mapped_column(String(40), index=True)

@@ -1,9 +1,10 @@
 """Run daily: python -m app.jobs. Deletes personal search traces after 30 days."""
 from datetime import datetime, timedelta, timezone
 from sqlalchemy import delete
-from .database import Session, Search, Interaction, Transaction, Redemption
+from .database import Session, Search, Interaction, Transaction, Redemption, AuthSession, now
 def retain():
     with Session() as db:
+        db.execute(delete(AuthSession).where(AuthSession.expires_at < now()))
         cutoff=(datetime.now(timezone.utc)-timedelta(days=30)).isoformat()
         db.execute(delete(Search).where(Search.created_at < cutoff))
         db.execute(delete(Interaction).where(Interaction.created_at < cutoff))

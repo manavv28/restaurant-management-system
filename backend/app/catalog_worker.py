@@ -28,6 +28,7 @@ async def run_one():
         stale=(datetime.now(timezone.utc)-timedelta(minutes=10)).isoformat()
         for row in db.scalars(select(CatalogJob).where(CatalogJob.state=='running',CatalogJob.started_at<stale)):
             row.state='queued' if row.attempts<3 else 'failed';row.error='Worker lease expired'
+            if row.state=='failed':row.finished_at=now()
         db.commit()
         candidates=db.scalars(select(CatalogJob).where(CatalogJob.state=='queued',CatalogJob.available_at<=now()).order_by(CatalogJob.id).limit(20)).all()
         job=None
@@ -43,6 +44,8 @@ async def run_one():
             if source.kind=='osm':
                 payload=await discover_osm(source)
                 trace.append({'agent':'Discovery','tool':'overpass','records':len(payload['elements'])})
+                source=db.scalar(select(CatalogSource).where(CatalogSource.id==source.id).with_for_update().execution_options(populate_existing=True))
+                if not source.enabled:raise ValueError('Source disabled')
                 result=import_osm(db,payload,source.area)
             elif source.kind=='approved_menu':
                 html=await fetch_menu(source)
@@ -53,6 +56,8 @@ async def run_one():
                     items,note=await ai_menu(text);method=note
                 trace.append({'agent':'Menu intelligence','tool':method,'extracted':len(items)})
                 if not items:raise ValueError('No unambiguous INR menu items extracted; review source or configure Gemini')
+                source=db.scalar(select(CatalogSource).where(CatalogSource.id==source.id).with_for_update().execution_options(populate_existing=True))
+                if not source.enabled:raise ValueError('Source disabled')
                 result=persist_menu(db,source,html,items)
             else:raise ValueError('Unsupported source kind')
             trace.append({'agent':'Data lake','tool':'source_deduplication_and_upsert','output':result})
@@ -83,7 +88,9 @@ def main():
     parser.add_argument('--once',action='store_true')
     parser.add_argument('--loop',action='store_true')
     args=parser.parse_args()
-    Base.metadata.create_all(engine)
+    import os
+    if os.getenv('AUTO_CREATE_SCHEMA','false' if os.getenv('APP_ENV')=='production' else 'true').lower()=='true':
+        Base.metadata.create_all(engine)
     with Session() as db:
         if args.seed_osm:
             for area in AREAS:

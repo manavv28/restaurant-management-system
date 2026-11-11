@@ -121,3 +121,22 @@ def test_search_snapshot_and_history_delete(client):
 def test_exact_customer_phrase():
     intent=parse_local('I feel like eating Chinese in a 2 km radius. Can I get Haka noodles for 300?')
     assert intent.dish=='hakka noodles' and intent.max_budget==300 and intent.radius_km==2
+
+
+def test_pause_withdraws_prices_and_refresh_is_owner_scoped(client,monkeypatch):
+    monkeypatch.setenv('APPROVED_MENU_HOSTS','menu.example.test')
+    owner=account(client,'pause-owner@example.test','owner');rid=restaurant(client,owner)
+    created=client.post(f'/portal/restaurants/{rid}/sources',headers=owner,json={'url':'https://menu.example.test/menu','permission_note':'I own this menu and permit collection'}).json()
+    sid=created['source_id'];path=f'/portal/restaurants/{rid}/sources/{sid}'
+    with Session() as db:
+        s=db.get(CatalogSource,sid);persist_menu(db,s,html(),structured_menu(html())[0]);db.commit()
+    assert client.post('/search',json={'query':'Hakka noodles','include_samples':False}).json()['results']
+    assert client.post(path+'/refresh',headers=owner).json()['state']=='queued'
+    assert client.put(path,headers=owner,json={'enabled':False}).status_code==200
+    assert not client.post('/search',json={'query':'Hakka noodles','include_samples':False}).json()['results']
+    assert client.post(path+'/refresh',headers=owner).status_code==409
+    other=account(client,'pause-other@example.test','owner')
+    assert client.put(path,headers=other,json={'enabled':True}).status_code==403
+    assert client.put(path,headers=owner,json={'enabled':True}).status_code==200
+    # Re-enabling never makes withdrawn evidence fresh without another collection.
+    assert not client.post('/search',json={'query':'Hakka noodles','include_samples':False}).json()['results']

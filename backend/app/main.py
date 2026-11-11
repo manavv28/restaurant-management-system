@@ -1,12 +1,12 @@
 import json, os, uuid, logging
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from fastapi import FastAPI, Depends, HTTPException
+from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, func, delete
 from sqlalchemy.exc import IntegrityError
 from .database import *
-from .security import db_session, current_user, optional_user, owner, token, passwords
+from .security import db_session, current_user, optional_user, owner, passwords, sign_in, COOKIE
 from .schemas import *
 from .agents import AREAS, understand, menu_search, discover_places, clean_places
 from .seed import seed
@@ -14,17 +14,40 @@ logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
 async def lifespan(app):
-    if os.getenv('AUTO_CREATE_SCHEMA','true').lower()=='true':
+    if os.getenv('APP_ENV')=='production' and is_sqlite:
+        raise RuntimeError('Production requires an explicit PostgreSQL DATABASE_URL')
+    if os.getenv('AUTO_CREATE_SCHEMA','false' if os.getenv('APP_ENV')=='production' else 'true').lower()=='true':
         Base.metadata.create_all(engine)
     else:
         # Fail startup before accepting traffic if the migration job has not run.
-        with Session() as db:db.execute(select(Restaurant.id).limit(1))
-    if os.getenv('SEED_SAMPLE_DATA','true').lower() == 'true':
+        with Session() as db:
+            for table in Base.metadata.sorted_tables: db.execute(select(table).limit(0))
+    if os.getenv('SEED_SAMPLE_DATA','false' if os.getenv('APP_ENV')=='production' else 'true').lower() == 'true':
         with Session() as db: seed(db)
     yield
 
 app = FastAPI(title='BiteAI API',version='0.1.0',lifespan=lifespan)
 app.add_middleware(CORSMiddleware,allow_origins=os.getenv('CORS_ORIGINS','http://localhost:3000,http://127.0.0.1:3000').split(','),allow_methods=['GET','POST','PUT','DELETE'],allow_headers=['Authorization','Content-Type'])
+
+@app.middleware('http')
+async def browser_security(request: Request, call_next):
+    from starlette.responses import JSONResponse
+    if request.method not in ('GET','HEAD','OPTIONS') and request.cookies.get(COOKIE) and not request.headers.get('authorization'):
+        # A non-simple header forces a CORS preflight for cross-origin requests.
+        # Only same-origin rewrites are supported for browser authentication.
+        if request.headers.get('x-biteai-client') != 'browser' or request.headers.get('sec-fetch-site') == 'cross-site':
+            return JSONResponse({'detail':'Browser request verification failed'},status_code=403)
+    response = await call_next(request)
+    if request.url.path.startswith(('/auth','/me','/portal','/payments')):
+        response.headers['Cache-Control'] = 'no-store'
+    return response
+
+@app.post('/auth/logout')
+def logout(request:Request,response:Response,user=Depends(current_user),db=Depends(db_session)):
+    session=db.get(AuthSession,request.state.session_id)
+    if session: db.delete(session); db.commit()
+    response.delete_cookie(COOKIE,path='/')
+    return {'signed_out':True}
 
 def public(obj):
     return {c.name:getattr(obj,c.name) for c in obj.__table__.columns if c.name != 'password_hash'}
@@ -61,22 +84,22 @@ def eligibility(db,user,campaign):
 @app.get('/health')
 def health(db=Depends(db_session)):
     db.execute(select(1))
-    return {'status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local rules','google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'signed provider webhook configured' if os.getenv('RAZORPAY_WEBHOOK_SECRET') else 'simulation only'}
+    return {'status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local rules','google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'provider configured; merchant onboarding required' if all(os.getenv(k) for k in ('RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET')) else 'provider unavailable', 'payment_simulation':os.getenv('ENABLE_PAYMENT_SIMULATION','true' if os.getenv('APP_ENV')!='production' else 'false').lower()=='true'}
 
 @app.post('/auth/register')
-def register(body:Register,db=Depends(db_session)):
+def register(body:Register,request:Request,response:Response,db=Depends(db_session)):
     user = User(email=body.email.strip().lower(),name=body.name.strip(),password_hash=passwords.hash(body.password),role=body.role)
     db.add(user)
     try: db.commit()
     except IntegrityError:
         db.rollback(); raise HTTPException(409,'Email already registered')
-    return {'token':token(user),'user':public(user)}
+    return {**sign_in(user,db,request,response),'user':public(user)}
 
 @app.post('/auth/login')
-def login(body:Login,db=Depends(db_session)):
+def login(body:Login,request:Request,response:Response,db=Depends(db_session)):
     user = db.scalar(select(User).where(User.email==body.email.strip().lower()))
     if not user or not passwords.verify(body.password,user.password_hash): raise HTTPException(401,'Incorrect email or password')
-    return {'token':token(user),'user':public(user)}
+    return {**sign_in(user,db,request,response),'user':public(user)}
 
 @app.get('/me')
 def me(user=Depends(current_user),db=Depends(db_session)):
@@ -161,6 +184,7 @@ def favourite(rid:int,menu_item_id:int=0,user=Depends(current_user),db=Depends(d
 
 @app.put('/me/consent')
 def consent(body:ConsentInput,user=Depends(current_user),db=Depends(db_session)):
+    user=db.scalar(select(User).where(User.id==user.id).with_for_update().execution_options(populate_existing=True))
     user.consent=body.consent; db.commit()
     return {'consent':user.consent,'message':'Withdrawal stops new payment processing; existing audit summaries remain until retention expiry.'}
 
@@ -170,7 +194,7 @@ def transactions(user=Depends(current_user),db=Depends(db_session)):
 
 @app.post('/payments/simulate')
 def simulate(body:TransactionInput,user=Depends(current_user),db=Depends(db_session)):
-    if os.getenv('ENABLE_PAYMENT_SIMULATION','true').lower() != 'true': raise HTTPException(403,'Simulation disabled')
+    if os.getenv('ENABLE_PAYMENT_SIMULATION','false' if os.getenv('APP_ENV')=='production' else 'true').lower() != 'true': raise HTTPException(403,'Simulation disabled')
     if not user.consent: raise HTTPException(403,'Explicit payment-data consent required')
     restaurant_or_404(db,body.restaurant_id)
     t = Transaction(user_id=user.id,restaurant_id=body.restaurant_id,reference='SIM-'+uuid.uuid4().hex,amount_paise=body.amount_paise,simulated=True)
@@ -363,3 +387,28 @@ def menu_details(db,item):
     evidence=db.get(MenuEvidence,item.id)
     return {**public(item),'price_status':('fresh source observation' if evidence.active and evidence.expires_at>now() else 'stale or withdrawn source price') if evidence else 'sample' if db.get(Restaurant,item.restaurant_id).sample else 'owner supplied; unverified',
             'source_expires_at':evidence.expires_at if evidence else None}
+
+
+@app.put('/portal/restaurants/{rid}/sources/{sid}')
+def source_enabled(rid:int,sid:int,body:SourceState,user=Depends(owner),db=Depends(db_session)):
+    owned(db,rid,user)
+    source=db.scalar(select(CatalogSource).where(CatalogSource.id==sid,CatalogSource.restaurant_id==rid).with_for_update())
+    if not source:raise HTTPException(404,'Source not found')
+    source.enabled=body.enabled
+    if not body.enabled:
+        for evidence in db.scalars(select(MenuEvidence).where(MenuEvidence.source_id==sid)): evidence.active=False
+    db.commit()
+    return {'source_id':sid,'enabled':source.enabled,'message':'Source enabled; prices refresh after successful collection.' if body.enabled else 'Collection disabled and source prices withdrawn.'}
+
+@app.post('/portal/restaurants/{rid}/sources/{sid}/refresh')
+def refresh_source(rid:int,sid:int,user=Depends(owner),db=Depends(db_session)):
+    owned(db,rid,user)
+    source=db.get(CatalogSource,sid)
+    if not source or source.restaurant_id!=rid:raise HTTPException(404,'Source not found')
+    if not source.enabled:raise HTTPException(409,'Enable the source before refreshing')
+    existing=db.scalar(select(CatalogJob).where(CatalogJob.source_id==sid,CatalogJob.state.in_(['queued','running'])))
+    if existing:return {'job_id':existing.id,'state':existing.state}
+    job=CatalogJob(source_id=sid);db.add(job)
+    try:db.commit()
+    except IntegrityError:db.rollback();raise HTTPException(409,'Refresh already queued; reload status')
+    return {'job_id':job.id,'state':job.state}
