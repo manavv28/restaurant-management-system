@@ -5,8 +5,8 @@ The application is deployed at https://restaurant-management-system-qxtx.vercel.
 ## Information you can provide in chat
 
 1. **Discovery/menu sources:** the user selected Google for discovery and has no restaurant-authorized menu sources. Configure the existing Google Places adapter with a restricted server-side API key. Places discovery does not establish current dishes/prices; verified menu evidence is still needed for complete real budget matching. The 378 current OSM records contain no inferred menu prices.
-2. **Email sender:** selected Gmail address **mantempp@gmail.com**. Gmail App Password setup and actual delivery verification remain pending; see [BACKUPS.md](BACKUPS.md).
-3. **Alert recipient:** selected **mantempp@gmail.com**. Daily health-check email automation is prepared; secure SMTP credentials and delivery verification remain pending.
+2. **Email sender:** selected Gmail address **letsbiteai@gmail.com**. Gmail App Password setup and actual delivery verification remain pending; see [BACKUPS.md](BACKUPS.md).
+3. **Alert recipient:** selected **letsbiteai@gmail.com**. Daily health-check email automation is prepared; secure SMTP credentials and delivery verification remain pending.
 4. **Backup destination:** confirmed encrypted GitHub artifacts retained seven days. Workflow, secure secret names, recovery instructions and default-branch scheduling requirement are in [BACKUPS.md](BACKUPS.md). Keep the decryption secret separately from backup files.
 5. **Payments:** identify the onboarded restaurant/merchant and whether you have a Razorpay test account. Complete legal/KYC and settlement approval directly with the payment provider before any live charging.
 

@@ -2,7 +2,7 @@
 
 The prepared workflow is `.github/workflows/operations.yml`. It backs up the application's **public schema** from Supabase using PostgreSQL 17, encrypts the stream with GnuPG AES-256 before writing it, and uploads only the encrypted file. GitHub artifact retention is seven days. It does not back up Supabase Auth, Storage objects, project settings, roles or extension installation. BiteAI currently uses its own public-schema accounts. Preserve the migrations and extension setup alongside backups.
 
-The workflow also checks both public API origins daily, retries three times to allow Render Free to wake, and emails failures to **mantempp@gmail.com** through that Gmail account. This is a daily check, not continuous monitoring. Missing credentials produce an explicit failed job. GitHub usage and artifact quotas still apply; public-repository artifacts must be treated as publicly accessible even though their content is encrypted.
+The workflow also checks both public API origins daily, retries three times to allow Render Free to wake, and emails failures to **letsbiteai@gmail.com** through that Gmail account. This is a daily check, not continuous monitoring. Missing credentials produce an explicit failed job. GitHub usage and artifact quotas still apply; public-repository artifacts must be treated as publicly accessible even though their content is encrypted.
 
 ## Secure configuration required
 
@@ -11,9 +11,9 @@ Under repository Settings → Secrets and variables → Actions, add:
 - `BACKUP_DATABASE_URL`: existing Supabase **session-pooler or direct libpq URL**, scheme `postgresql://`, with `sslmode=verify-full`. Use a credential authorized to read all application rows. Transaction pooling is unsuitable for pg_dump.
 - `SUPABASE_CA_PEM`: official Supabase database CA certificate PEM, obtained through the project's connection settings. This is trust configuration rather than a password.
 - `BACKUP_PASSPHRASE`: a randomly generated single-line secret of at least 32 characters. Keep a separate copy in your password manager. Losing it makes every retained backup unrecoverable; changing it requires retaining the old key for old backups.
-- `SMTP_PASSWORD`: a Gmail **App Password** for mantempp@gmail.com, created in Google Account security with two-step verification enabled. A normal Gmail account password will not work. Account policies may disallow App Passwords.
+- `SMTP_PASSWORD`: a Gmail **App Password** for letsbiteai@gmail.com, created in Google Account security with two-step verification enabled. A normal Gmail account password will not work. Account policies may disallow App Passwords.
 
-In Render → biteai-demo → Environment, configure `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER=mantempp@gmail.com`, `EMAIL_FROM=mantempp@gmail.com` and the same App Password as `SMTP_PASSWORD`. Preserve the existing `PUBLIC_APP_URL`, `DATABASE_URL` and `JWT_SECRET`. Gmail supports a small initial setup; delivery quotas apply. A Gmail address cannot serve as a custom verified domain.
+In Render → biteai-demo → Environment, configure `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER=letsbiteai@gmail.com`, `EMAIL_FROM=letsbiteai@gmail.com` and the same App Password as `SMTP_PASSWORD`. Preserve the existing `PUBLIC_APP_URL`, `DATABASE_URL` and `JWT_SECRET`. Gmail supports a small initial setup; delivery quotas apply. A Gmail address cannot serve as a custom verified domain.
 
 No credential should be pasted into chat or committed. Enter credential values in the account’s secure settings; the existing connections do not supply the missing database password or Gmail App Password.
 

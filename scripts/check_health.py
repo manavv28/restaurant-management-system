@@ -26,13 +26,13 @@ def check():
     if not os.getenv('SMTP_PASSWORD'):
         raise SystemExit('Health check failed; SMTP alert credentials are missing')
     message=EmailMessage()
-    message['From']='mantempp@gmail.com'
-    message['To']='mantempp@gmail.com'
+    message['From']='letsbiteai@gmail.com'
+    message['To']='letsbiteai@gmail.com'
     message['Subject']='BiteAI health check failed'
     message.set_content('These BiteAI origins failed three health checks:\n'+'\n'.join(failed)+'\nInspect Render and GitHub Actions logs. Render Free may need time to wake.')
     try:
         with smtplib.SMTP_SSL('smtp.gmail.com',465,timeout=20,context=ssl.create_default_context()) as smtp:
-            smtp.login('mantempp@gmail.com',os.environ['SMTP_PASSWORD'])
+            smtp.login('letsbiteai@gmail.com',os.environ['SMTP_PASSWORD'])
             smtp.send_message(message)
     except Exception:
         raise SystemExit('Health check failed and alert delivery failed') from None

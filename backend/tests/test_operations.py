@@ -11,7 +11,7 @@ backup=importlib.util.module_from_spec(spec);spec.loader.exec_module(backup)
 
 def test_mail_requires_credentials_and_secure_links(monkeypatch):
     from app.account_security import mail_enabled
-    for key,value in {'SMTP_HOST':'smtp.gmail.com','SMTP_USER':'mantempp@gmail.com','EMAIL_FROM':'mantempp@gmail.com','PUBLIC_APP_URL':'https://example.test'}.items():
+    for key,value in {'SMTP_HOST':'smtp.gmail.com','SMTP_USER':'letsbiteai@gmail.com','EMAIL_FROM':'letsbiteai@gmail.com','PUBLIC_APP_URL':'https://example.test'}.items():
         monkeypatch.setenv(key,value)
     monkeypatch.delenv('SMTP_PASSWORD',raising=False)
     assert not mail_enabled()
@@ -60,7 +60,7 @@ def test_health_retries_and_sends_only_failure_origins(monkeypatch):
         def __init__(self,*args,**kwargs):pass
         def __enter__(self):return self
         def __exit__(self,*args):pass
-        def login(self,user,password):assert user=='mantempp@gmail.com' and password=='fixture'
+        def login(self,user,password):assert user=='letsbiteai@gmail.com' and password=='fixture'
         def send_message(self,message):sent.append(message)
     monkeypatch.setattr(health.urllib.request,'urlopen',response)
     monkeypatch.setattr(health.time,'sleep',lambda _:None)

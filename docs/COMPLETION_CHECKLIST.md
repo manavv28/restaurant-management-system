@@ -67,7 +67,7 @@ Real microphone transcription still needs confirmation in a supported end-user b
 
 ## Backup and email setup follow-up
 
-Daily encrypted backup and health-check automation is implemented in `.github/workflows/operations.yml`; Gmail sender/alert recipient is mantempp@gmail.com. Seven-day artifact retention is configured. Encryption round-trip, wrong-key rejection, failed-dump cleanup and incomplete-SMTP readiness have automated coverage. See [BACKUPS.md](BACKUPS.md) for secure secrets, restore steps and the default-branch scheduling prerequisite. Production backup creation/recovery and actual mail/alert delivery remain unchecked until credentials and activation are complete.
+Daily encrypted backup and health-check automation is implemented in `.github/workflows/operations.yml`; Gmail sender/alert recipient is letsbiteai@gmail.com. Seven-day artifact retention is configured. Encryption round-trip, wrong-key rejection, failed-dump cleanup and incomplete-SMTP readiness have automated coverage. See [BACKUPS.md](BACKUPS.md) for secure secrets, restore steps and the default-branch scheduling prerequisite. Production backup creation/recovery and actual mail/alert delivery remain unchecked until credentials and activation are complete.
 
 ## Release verification, 11 November 2026 follow-up
 
