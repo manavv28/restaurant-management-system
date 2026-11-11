@@ -40,3 +40,57 @@ def test_mismatch_and_withdrawal_do_not_credit_spending(client,monkeypatch):
     assert send(20000).status_code==409
     assert send(30000).status_code==409
     assert client.get('/me',headers=auth).json()['verified_spend_paise']==0
+
+
+def test_validated_provider_order_and_private_status(client,monkeypatch):
+    import httpx
+    auth=account(client)
+    owner=account(client,'provider-owner@example.test','owner');rid=restaurant(client,owner)
+    client.put('/me/consent',headers=auth,json={'consent':True})
+    for key,value in {'RAZORPAY_KEY_ID':'rzp_test_fixture','RAZORPAY_KEY_SECRET':'fixture-key','RAZORPAY_WEBHOOK_SECRET':'fixture-webhook','RAZORPAY_RESTAURANT_IDS':str(rid)}.items():monkeypatch.setenv(key,value)
+    original=httpx.AsyncClient
+    seen=[]
+    def handler(request):
+        seen.append(json.loads(request.content))
+        return httpx.Response(200,json={'id':'order_ProviderTest','amount':30000,'currency':'INR'})
+    monkeypatch.setattr(httpx,'AsyncClient',lambda **kw:original(transport=httpx.MockTransport(handler),**kw))
+    assert client.get(f'/payments/availability/{rid}').json()['enabled']
+    response=client.post('/payments/orders',headers=auth,json={'restaurant_id':rid,'amount_paise':30000})
+    assert response.status_code==200,response.text
+    assert seen[0]['amount']==30000 and seen[0]['currency']=='INR'
+    assert client.get('/payments/orders/order_ProviderTest',headers=auth).json()['state']=='created'
+    other=account(client,'provider-other@example.test')
+    assert client.get('/payments/orders/order_ProviderTest',headers=other).status_code==404
+    assert client.get('/me',headers=auth).json()['verified_spend_paise']==0
+
+
+def test_malformed_signed_event_is_bad_request(client,monkeypatch):
+    monkeypatch.setenv('RAZORPAY_WEBHOOK_SECRET','fixture-secret')
+    for order_id in (None,123,[],{}):
+        event={'event':'payment.captured','payload':{'payment':{'entity':{'id':'pay_Test','order_id':order_id,'amount':30000,'currency':'INR','status':'captured'}}}}
+        raw=json.dumps(event).encode()
+        response=client.post('/payments/webhook',content=raw,headers={'x-razorpay-signature':hmac.new(b'fixture-secret',raw,hashlib.sha256).hexdigest()})
+        assert response.status_code==400
+
+
+def test_signed_refund_and_dispute_adjust_verified_eligibility(client,monkeypatch):
+    auth=account(client);owner=account(client,'refund-owner@example.test','owner');rid=restaurant(client,owner)
+    uid=client.get('/me',headers=auth).json()['id']
+    with Session() as db:
+        db.add(Transaction(user_id=uid,restaurant_id=rid,reference='razorpay:pay_RefundFixture',amount_paise=30000,simulated=False));db.commit()
+    monkeypatch.setenv('RAZORPAY_WEBHOOK_SECRET','fixture-secret')
+    def send(event,identifier,amount=10000,timestamp=0):
+        entity={'id':identifier,'payment_id':'pay_RefundFixture','amount':amount,'currency':'INR'}
+        payload={'event':event,'created_at':timestamp,'payload':{'refund' if event=='refund.processed' else 'dispute':{'entity':entity}}}
+        raw=json.dumps(payload).encode()
+        return client.post('/payments/webhook',content=raw,headers={'x-razorpay-signature':hmac.new(b'fixture-secret',raw,hashlib.sha256).hexdigest()})
+    assert send('refund.processed','rfnd_Test').json()['status']=='adjusted'
+    assert send('refund.processed','rfnd_Test').json()['status']=='duplicate'
+    assert client.get('/me',headers=auth).json()['verified_spend_paise']==20000
+    assert send('refund.processed','rfnd_TooMuch',25000).status_code==409
+    assert send('payment.dispute.created','disp_Test',20000,100).json()['disputed']
+    assert client.get('/me',headers=auth).json()['verified_spend_paise']==0
+    assert not send('payment.dispute.won','disp_Test',20000,200).json()['disputed']
+    assert client.get('/me',headers=auth).json()['verified_spend_paise']==20000
+    # A delayed old dispute event must not undo a newer resolution.
+    assert not send('payment.dispute.lost','disp_Test',20000,150).json()['disputed']

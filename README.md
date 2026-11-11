@@ -1,5 +1,7 @@
 # BiteAI · Mumbai food discovery
 
+Current hosting target: **Render Free + Supabase PostgreSQL**. See [current setup](docs/RENDER_SUPABASE.md) and [current completion checklist](docs/COMPLETION_CHECKLIST.md). Use `render-supabase.yaml` for a fresh install. Older deployment notes below describe historical sample deployments. The current revision is not yet deployment-ready.
+
 A working development MVP with Next.js/TypeScript/Tailwind, Python/FastAPI, relational persistence, structured food search, owner portal and auditable personalised rewards.
 
 **Data honesty:** included restaurants and menus are fictional samples, clearly labelled. There is no complete Mumbai dataset, independently verified menu pricing, live ordering, or live payment integration. Owner supplied records remain unverified. No external API success is simulated.

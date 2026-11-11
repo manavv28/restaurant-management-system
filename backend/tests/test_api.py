@@ -1,7 +1,7 @@
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
-os.environ['DATABASE_URL']='sqlite:///'+tempfile.mktemp(suffix='.sqlite')
+os.environ['DATABASE_URL']=os.getenv('TEST_DATABASE_URL') or 'sqlite:///'+tempfile.mktemp(suffix='.sqlite')
 os.environ['JWT_SECRET']='test-secret-only-abcdefghijklmnopqrstuvwxyz'
 from fastapi.testclient import TestClient
 from sqlalchemy import select

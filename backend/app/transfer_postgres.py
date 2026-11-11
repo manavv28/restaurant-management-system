@@ -11,7 +11,8 @@ def postgres_engine(url):
     if url.startswith('postgres://'):url=url.replace('postgres://','postgresql+psycopg://',1)
     elif url.startswith('postgresql://'):url=url.replace('postgresql://','postgresql+psycopg://',1)
     if not url.startswith('postgresql+psycopg://'):raise ValueError('Both databases must use PostgreSQL')
-    return create_engine(url,pool_pre_ping=True,hide_parameters=True)
+    from .database_tls import connection_url
+    return create_engine(connection_url(url),pool_pre_ping=True,hide_parameters=True)
 
 def fingerprint(rows):
     digest=hashlib.sha256();count=0

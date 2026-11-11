@@ -186,7 +186,7 @@ async def discover_osm(source):
                 if len(content)>5_000_000:raise ValueError('OSM result exceeds batch limit')
     return json.loads(content)
 
-def persist_menu(db,source,html,items):
+def persist_menu(db,source,html,items,page_url=None):
     digest=hashlib.sha256(html.encode()).hexdigest();changes=[]
     existing=db.scalars(select(MenuEvidence).where(MenuEvidence.source_id==source.id)).all()
     # Only deactivate after a valid nonempty extraction. Empty/error extraction preserves
@@ -207,7 +207,9 @@ def persist_menu(db,source,html,items):
             restaurant=db.get(Restaurant,source.restaurant_id)
             item=MenuItem(restaurant_id=source.restaurant_id,name=incoming['name'],cuisine=restaurant.cuisine)
             db.add(item)
-        item.price_paise=incoming['price_paise'];item.source=source.url+' (source observed; not independently verified)'
+        from .discovery import classify
+        item.category=classify(incoming['name'])
+        item.price_paise=incoming['price_paise'];item.source=(page_url or source.url)+' (source observed; not independently verified)'
         db.flush()
         evidence=db.get(MenuEvidence,item.id)
         if evidence is None:evidence=MenuEvidence(menu_item_id=item.id);db.add(evidence)

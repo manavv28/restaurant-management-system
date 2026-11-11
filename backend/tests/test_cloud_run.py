@@ -2,7 +2,7 @@ import os,subprocess,sys
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import inspect
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import DBAPIError
 from test_api import client
 from app.database import Base,engine
 from app.main import app
@@ -15,7 +15,7 @@ def test_production_refuses_ephemeral_sqlite():
 def test_pre_migration_startup_fails_without_creating_tables(monkeypatch):
     Base.metadata.drop_all(engine)
     monkeypatch.setenv('AUTO_CREATE_SCHEMA','false')
-    with pytest.raises(OperationalError):
+    with pytest.raises(DBAPIError):
         with TestClient(app):pass
     assert 'restaurants' not in inspect(engine).get_table_names()
 

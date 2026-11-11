@@ -233,3 +233,6 @@ frontend/playwright-report/
 # Generated database trust bundle
 backend/app/certs/supabase-bundle.pem
 backend/app/certs/supabase-bundle.json
+
+work/
+supabase/.temp/
