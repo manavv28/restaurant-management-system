@@ -10,7 +10,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   backup:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
     env:
       BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
@@ -44,7 +44,7 @@ jobs:
         if: always()
         run: rm -rf backups "$RUNNER_TEMP/supabase-ca.pem" "$RUNNER_TEMP/biteai-gnupg"
   health:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
