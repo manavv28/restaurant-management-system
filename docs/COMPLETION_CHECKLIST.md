@@ -25,20 +25,20 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 - [x] Retention worker runs every six hours while Render is awake; structured request IDs and sanitized server-error logs support diagnosis. No always-on worker is promised.
 - [x] Isolated pg_dump/pg_restore rehearsal: 378 records, matching complete-row hash.
 - [x] Legacy Render database inspected read-only: zero users/favourites/transactions; six sample restaurants and sample campaigns. Nothing was deleted or automatically transferred.
-- [x] Backend PostgreSQL suite: **56 passed**. SQLite suite and browser results are in the current work report; ten browser journeys cover core flows, cookie revocation, location permission/denial, voice adapter/fallback and checkout-status behavior.
+- [x] Backend PostgreSQL suite: **58 passed**. SQLite: **53 passed, 5 PostgreSQL-only skips**; ten browser journeys cover core flows, cookie revocation, location permission/denial, voice adapter/fallback and checkout-status behavior.
 - [x] Production frontend build/TypeScript checks passed.
 - [x] CI runs PostgreSQL/schema/transfer tests, browser journeys, the actual production Docker build and image smoke checks on a hosted builder.
 
-## Hosting verification in progress
+## Hosting verification completed
 
-- [x] Hosted CI image build and non-root database-backed image smoke check passed: Actions run 42984898701.
+- [x] Hosted CI image build and non-root database-backed image smoke check passed: Actions run 42988831331.
 - [x] PRs #4 and #3 merged into deploy/biteai-mvp; matching release deployed to Render and the selected Vercel production project.
 - [x] Both public API origins verified: matching release, Supabase verify-full TLS, real catalog/freshness, Secure/HttpOnly/SameSite cookies, CSRF, consent persistence, owner isolation, login and logout/replay rejection.
-- [ ] Hosted live-browser check is running to verify the public mobile UI with normal certificate validation. Local external-browser automation hit environment CA/profile restrictions; TLS verification was never disabled.
+- [x] Hosted live-browser check passed against the public mobile UI with normal certificate validation: [run 42988831196](https://github.com/manavv28/restaurant-management-system/actions/runs/42988831196). Its artifact includes the mobile screenshot. Local external-browser CA/profile limitations were handled by using the hosted runner; certificate verification was never disabled.
 
 ## Requires external configuration or evidence
 
-- [ ] Approve restaurant website domains for real menu collection. Broad discovery metadata is now present, but menus/prices cannot be fabricated or collected from unapproved hosts.
+- [ ] Approve restaurant website domains, collect real menus/prices, and verify the complete real dish/budget-match journey. Discovery metadata is present, but source-backed menu-price coverage is currently zero; prices cannot be fabricated or collected from unapproved hosts.
 - [ ] Configure Gemini and Google Places keys and validate real provider responses/quotas. Optional Google Maps rendering requires a referrer-restricted browser key. Deterministic text search and Leaflet work without these keys.
 - [ ] Configure TLS SMTP, sender identity and PUBLIC_APP_URL; verify actual email delivery and a real verification/reset email. No email was sent to a real user during tests.
 - [ ] Complete legal merchant onboarding/settlement/routing and validate Razorpay sandbox captures/refunds/disputes end to end before enabling charges. Signed fixtures validate application behavior; they are not provider certification.
@@ -54,3 +54,11 @@ The implementation release `89f10fee1d96020e81b6c825969a314b0acfa403` was verifi
 GitHub Actions run https://github.com/manavv28/restaurant-management-system/actions/runs/42984898701 passed 56 PostgreSQL tests, all 10 browser journeys, production frontend build, actual Docker build and non-root image/database smoke test. SQLite passed 51 tests with 5 PostgreSQL-only skips. The separate public-release workflow captures a mobile screenshot and checks the current production origin without weakening browser certificate checks.
 
 The remaining unchecked external-configuration items above still prevent a full production-ready claim. The application runs with explicit provider fallbacks and unknown menu prices.
+
+## Final release and reliability verification
+
+Application release `9c8cece4268db8d82341dd774446b4df5412543b` is deployed on both selected origins. Live testing exposed synchronous catalog scans blocking the API event loop and causing Render health timeouts. The fix moves database search work to the thread pool, releases read transactions before provider calls, uses a correlated anti-join and indexed geographic prefilter for unknown-price results, and binds/verifies the public frontend before starting background workers. Regression tests prove health remains responsive while database search waits and unknown-price listing performs at most two SELECTs for 80 restaurants.
+
+[Final integration run 42988831331](https://github.com/manavv28/restaurant-management-system/actions/runs/42988831331) passed all 58 PostgreSQL checks, 10 Chromium journeys, frontend build/typecheck, production Docker build and non-root image/database smoke test. [Live browser run 42988831196](https://github.com/manavv28/restaurant-management-system/actions/runs/42988831196) passed the real production catalog/modal/attribution/mobile-layout checks with TLS validation enabled. Both public API origins also passed secure-cookie, CSRF, consent, owner isolation, login, private-history and logout/replay checks after the fix. No subsequent Render restart/failure event was observed during verification. Test fixture accounts were removed.
+
+Real microphone transcription still needs confirmation in a supported end-user browser; automated voice-recognition and unsupported-browser tests use a controlled adapter fixture. The backend remains on Render Free, with Supabase verify-full TLS and no paid infrastructure added.
