@@ -28,6 +28,9 @@ def parse_local(query, budget=500, radius=5):
     money = re.search(r'(?:under|below|budget(?: of)?|less than|for|₹|rs\.?)[\s₹]*(\d+)', q)
     km = re.search(r'(\d+(?:\.\d+)?)\s*(?:km|kilomet)', q)
     location = next((a for a in AREAS if a.lower() in q), None)
+    if not dish and not cuisine:
+        custom=re.search(r'(?:craving|want|find|eat(?:ing)?|get)\s+(?:some\s+)?(.+?)(?=\s+(?:under|below|within|near|in)\b|$)',q)
+        if custom and len(custom[1].split())<=5 and not any(c.lower()==custom[1].strip() for c in cuisines):dish=custom[1].strip(' .?!') or None
     return Intent(cuisine=cuisine, dish=dish, max_budget=int(money[1]) if money else budget,
                   radius_km=float(km[1]) if km else radius, location=location)
 
@@ -43,13 +46,15 @@ async def understand(query, budget, radius):
             r.raise_for_status()
             data = json.loads(r.json()['candidates'][0]['content']['parts'][0]['text'])
             return Intent.model_validate({**fallback.model_dump(), **data}), 'Gemini structured extraction'
-    except (httpx.HTTPError, ValueError, KeyError, IndexError):
+    except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
         log.warning('Gemini unavailable; using deterministic parser')
         return fallback, 'local rules (Gemini unavailable)'
 
 def menu_search(db, intent, lat, lng, include_samples=True):
     output = []
-    rows = db.execute(select(Restaurant, MenuItem).join(MenuItem).where(MenuItem.available.is_(True), MenuItem.price_paise <= intent.max_budget*100)).all()
+    from .geo import candidates
+    query=select(Restaurant, MenuItem).join(MenuItem).where(MenuItem.available.is_(True), MenuItem.price_paise <= intent.max_budget*100)
+    rows=db.execute(candidates(db,query,lat,lng,intent.radius_km)).all()
     for restaurant, item in rows:
         if restaurant.sample and not include_samples: continue
         evidence=db.get(MenuEvidence,item.id)
@@ -59,7 +64,7 @@ def menu_search(db, intent, lat, lng, include_samples=True):
         distance = distance_km(lat,lng,restaurant.latitude,restaurant.longitude)
         if distance > intent.radius_km: continue
         output.append((restaurant,item,distance))
-    output.sort(key=lambda r: (r[2]/intent.radius_km*.6 + r[1].price_paise/(intent.max_budget*100)*.4))
+    output.sort(key=lambda r: (r[2]/intent.radius_km*.5 + r[1].price_paise/(intent.max_budget*100)*.35 + (1-(r[0].rating/5 if r[0].rating is not None else .5))*.15))
     return output
 
 async def discover_places(area):
@@ -67,7 +72,7 @@ async def discover_places(area):
     if not key: raise ValueError('GOOGLE_PLACES_API_KEY is not configured')
     async with httpx.AsyncClient(timeout=20) as client:
         result = await client.post('https://places.googleapis.com/v1/places:searchText',
-            headers={'X-Goog-Api-Key':key,'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.location'},
+            headers={'X-Goog-Api-Key':key,'X-Goog-FieldMask':'places.id,places.displayName,places.formattedAddress,places.location,places.rating,places.userRatingCount,places.nationalPhoneNumber,places.websiteUri,places.googleMapsUri'},
             json={'textQuery': 'restaurants in '+area+', Mumbai, India','pageSize':20})
         result.raise_for_status()
         return result.json().get('places',[])

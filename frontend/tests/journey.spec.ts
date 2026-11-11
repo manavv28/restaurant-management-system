@@ -126,3 +126,62 @@ test('hosted checkout callback waits for verified server status',async({page})=>
  await page.getByRole('button',{name:'Check payment status'}).click();
  await expect(page.getByRole('status')).toContainText('Payment verified by the provider webhook');
 });
+
+test('location permission sets coordinates and denial keeps text search available',async({page,context})=>{
+ await context.grantPermissions(['geolocation']);await context.setGeolocation({latitude:19.0596,longitude:72.8295});
+ await page.goto('/');await page.getByRole('button',{name:'Use my location',exact:true}).click();
+ await expect(page.getByRole('button',{name:'GPS location set'})).toBeVisible();
+ const request=page.waitForRequest(r=>r.url().endsWith('/api/search')&&r.method()==='POST');
+ await page.getByRole('button',{name:'Find my food'}).click();
+ expect((await request).postDataJSON().latitude).toBe(19.0596);
+ await page.addInitScript(()=>{Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(_success:unknown,failure:(error:{code:number})=>void)=>failure({code:1})}})});
+ await page.reload();await page.getByRole('button',{name:'Use my location',exact:true}).click();
+ await expect(page.getByRole('alert').filter({hasText:'Location access was declined'})).toContainText('Location access was declined');
+ await expect(page.getByRole('textbox',{name:'Your food craving'})).toBeEnabled();
+});
+
+test('supported voice adapter submits recognised text and unsupported browsers fall back',async({page})=>{
+ await page.addInitScript(()=>{
+  class SpeechFixture {lang='';onresult:((event:unknown)=>void)|null=null;onend:(()=>void)|null=null;onerror:(()=>void)|null=null;start(){setTimeout(()=>{this.onresult?.({results:[[{transcript:'Chinese Hakka noodles under ₹300 within 2 km'}]]});this.onend?.()},10)}}
+  Object.defineProperty(window,'SpeechRecognition',{value:SpeechFixture,configurable:true});
+ });
+ await page.goto('/');await page.getByRole('button',{name:'Search by voice'}).click();
+ await expect(page.getByRole('textbox',{name:'Your food craving'})).toHaveValue('Chinese Hakka noodles under ₹300 within 2 km');
+ await expect(page.getByRole('button',{name:'Wok & Wonder',exact:true})).toBeVisible();
+ await page.evaluate(()=>{Object.defineProperty(window,'SpeechRecognition',{value:undefined,configurable:true});Object.defineProperty(window,'webkitSpeechRecognition',{value:undefined,configurable:true})});
+ await page.getByRole('button',{name:'Search by voice'}).click();
+ await expect(page.getByRole('status')).toContainText('Voice search isn’t supported');
+});
+
+test('discovery extras are honest and recovery reports unavailable email delivery',async({page})=>{
+ await page.goto('/');await expect(page.getByRole('heading',{name:'Popular dishes',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Picked for you',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Forgot your password?'}).click();
+ await expect(page.getByText('Email delivery is not available yet. Please try again once the service is configured.')).toBeVisible();
+ await expect(page.getByRole('button',{name:'Send reset link'})).toBeDisabled();
+});
+
+test('a delayed account refresh cannot overwrite a consent change',async({page})=>{
+ const headers={'X-BiteAI-Client':'browser'};
+ await page.request.post('/api/auth/register',{headers,data:{name:'Consent Race',email:`consent${Date.now()}@example.test`,password:'a-test-password-123'}});
+ await page.goto('/');await page.getByRole('button',{name:'Your space'}).click();
+ await expect(page.getByLabel('I consent to payment-data processing')).toBeVisible();
+ await page.getByRole('button',{name:'Discover',exact:true}).click();
+ let release:()=>void=()=>{};
+ const gate=new Promise<void>(resolve=>{release=resolve});
+ let seen:()=>void=()=>{};const requested=new Promise<void>(resolve=>{seen=resolve});
+ let settled:()=>void=()=>{};const finished=new Promise<void>(resolve=>{settled=resolve});
+ await page.route('**/api/me',async route=>{
+  const response=await route.fetch();const body=await response.json();
+  if(body.consent===false){seen();await gate;await route.fulfill({response,json:body})}else await route.fulfill({response});
+  settled();
+ },{times:1});
+ await page.getByRole('button',{name:'Your space'}).click();await requested;
+ try{
+  const update=page.waitForResponse(response=>response.url().endsWith('/api/me/consent')&&response.request().method()==='PUT');
+  await page.getByLabel('I consent to payment-data processing').check();
+  expect((await update).ok()).toBeTruthy();
+ }finally{release()}
+ await finished;
+ await expect(page.getByLabel('I consent to payment-data processing')).toBeChecked();
+});

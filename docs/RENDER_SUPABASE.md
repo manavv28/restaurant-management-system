@@ -69,3 +69,12 @@ The target defaults are `AUTO_CREATE_SCHEMA=false`, `SEED_SAMPLE_DATA=false`, `E
 Browser auth must use the same-origin `/api` rewrite. Cookies are HttpOnly, SameSite=Lax and Secure in production, backed by expiring database sessions. Browser mutations send `X-BiteAI-Client: browser`; this header is deliberately excluded from cross-origin CORS access. Bearer API clients remain supported. Deploy the frontend and backend from the same revision together. Update `API_INTERNAL_URL` only as described above; Next.js embeds rewrite destinations at build time.
 
 Current validation and remaining release gates are in [RECOVERY_VALIDATION.md](RECOVERY_VALIDATION.md). The new application revision has not been deployed to Render or Vercel.
+
+
+## Verified migration-history adoption
+
+During requirements completion, the hosted schema was compared with an isolated migrated database: column types/nullability, primary/foreign/check/unique constraints, indexes and RLS/browser-role access matched (excluding the additional optional PostGIS index). The seven SQL files are now recorded with SHA-256 checksums in `public.biteai_migrations`. Subsequent releases may use `PYTHONPATH=backend MIGRATIONS_DIR=supabase/migrations python -m app.cloud_run migrate`; the runner will skip verified old migrations and refuse edited checksums. Supabase CLI history still records the individual hosted changes, not the earlier manual baseline: do not use an unreviewed `supabase db push`.
+
+For another manually initialized database, `python -m app.adopt_migrations` first audits the current full schema without changing it; only an explicit `--adopt` records checksums after the audit passes. Take a backup first. Do not use adoption to conceal schema drift or skip unapplied migrations.
+
+Retention is supervised in-process by default and runs every six hours while awake. Free service sleeping pauses both collection and retention; startup/wake resumes the worker. No paid scheduler is created.

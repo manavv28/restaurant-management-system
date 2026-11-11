@@ -1,5 +1,7 @@
 # BiteAI recovery and integration validation
 
+Historical recovery checkpoint. See [COMPLETION_CHECKLIST.md](COMPLETION_CHECKLIST.md) for subsequent work and current release gates.
+
 Date: 11 November 2026 (Asia/Kolkata). **Not deployment-ready.**
 
 ## Recovery evidence

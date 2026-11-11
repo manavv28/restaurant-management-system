@@ -51,3 +51,9 @@ def current_user(user=Depends(optional_user)):
 def owner(user=Depends(current_user)):
     if user.role != 'owner': raise HTTPException(403,'Restaurant owner role required')
     return user
+
+
+def verified_user(user=Depends(current_user)):
+    required=os.getenv('REQUIRE_VERIFIED_EMAIL','true' if os.getenv('APP_ENV')=='production' else 'false').lower()=='true'
+    if required and not user.email_verified:raise HTTPException(403,'Verify your email before using payments or reserving offers')
+    return user

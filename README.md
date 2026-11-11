@@ -1,6 +1,6 @@
 # BiteAI · Mumbai food discovery
 
-Current hosting target: **Render Free + Supabase PostgreSQL**. See [current setup](docs/RENDER_SUPABASE.md) and [recovery validation / release gates](docs/RECOVERY_VALIDATION.md). Use `render-supabase.yaml` for a fresh install. Older deployment notes below describe historical sample deployments. The current revision is not yet deployment-ready.
+Current hosting target: **Render Free + Supabase PostgreSQL**. See [current setup](docs/RENDER_SUPABASE.md) and [current completion checklist](docs/COMPLETION_CHECKLIST.md). Use `render-supabase.yaml` for a fresh install. Older deployment notes below describe historical sample deployments. The current revision is not yet deployment-ready.
 
 A working development MVP with Next.js/TypeScript/Tailwind, Python/FastAPI, relational persistence, structured food search, owner portal and auditable personalised rewards.
 

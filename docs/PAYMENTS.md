@@ -10,3 +10,6 @@ Merchant onboarding, provider approval, restaurant settlement/routing, refunds a
 
 
 The restaurant modal now offers Razorpay hosted checkout only for real, explicitly onboarded restaurants when all three provider settings are present. Payment-data consent is required. The app loads the official checkout script on demand. A checkout callback checks `GET /payments/orders/{order_id}`; it never creates verified spending. That endpoint is scoped to the signed-in owner of the payment order. A pending order keeps checkout disabled in that modal; check its status and reconcile uncertain payments before attempting another payment. Browser tests use a mocked checkout script and status endpoint. No provider sandbox or live charge has been exercised.
+
+
+Signed `refund.processed` events deduct cumulative refunded amounts from eligible spending; fully refunded visits no longer count. Signed dispute creation/loss places spending on hold; a newer dispute win restores the remaining nonrefunded amount. Adjustment references deduplicate retries, bounds prevent excessive refund credit, and older dispute timestamps cannot undo newer resolutions. These handlers reconcile provider events; they do not initiate real refunds or establish merchant settlement. Real sandbox/provider validation is still required.
