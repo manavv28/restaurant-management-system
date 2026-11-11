@@ -3,7 +3,8 @@ from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy import select, func, delete
+from starlette.concurrency import run_in_threadpool
+from sqlalchemy import select, func, delete, or_, and_
 from sqlalchemy.exc import IntegrityError
 from .database import *
 from .security import db_session, current_user, optional_user, owner, passwords, sign_in, COOKIE, verified_user
@@ -129,10 +130,30 @@ def areas(): return AREAS
 
 @app.post('/search')
 async def search(body:SearchInput,user=Depends(optional_user),db=Depends(db_session)):
+    await run_in_threadpool(db.commit)
     try:
         intent, parser = await understand(body.query,body.budget,body.radius_km)
     except ValueError:
         raise HTTPException(422,'Budget must be ₹1–100,000 and radius must be greater than zero and at most 50 km')
+    data=await run_in_threadpool(search_database,body,intent,parser,user,db)
+    await run_in_threadpool(db.commit)
+    external=[]
+    if not data.get('results') and (intent.location or body.area) in AREAS and os.getenv('GOOGLE_PLACES_API_KEY') and os.getenv('DISCOVERY_ON_MISS','false').lower()=='true':
+        try:
+            places=await discover_places(intent.location or body.area)
+            from .agents import distance_km
+            for place in places:
+                location=place.get('location',{})
+                if 'latitude' not in location or 'longitude' not in location:continue
+                distance=distance_km(*( (body.latitude,body.longitude) if body.latitude is not None else AREAS[intent.location or body.area]),location['latitude'],location['longitude'])
+                if distance<=intent.radius_km:external.append({'name':place.get('displayName',{}).get('text','Unnamed restaurant'),'address':place.get('formattedAddress',''),'distance_km':round(distance,2),'maps_url':place.get('googleMapsUri',''),'notice':'Google Places discovery only; dish availability and menu prices are unknown.'})
+        except Exception:
+            logging.warning('External discovery unavailable; returning database results only')
+    data['external_discovery']=external
+    return data
+
+
+def search_database(body,intent,parser,user,db):
     area = intent.location or body.area
     if area not in AREAS:
         return {'results':[],'follow_up':'Choose an area in Mumbai or share your location.','trace':[]}
@@ -161,19 +182,7 @@ async def search(body:SearchInput,user=Depends(optional_user),db=Depends(db_sess
     for match in unique:
         db.add(SearchMatch(search_id=search_record.id,restaurant_id=match['restaurant']['id'],menu_item_id=match['dish']['id'],price_paise=match['dish']['price_paise'],distance_km=match['distance_km'],source=match['dish']['source']))
     db.commit()
-    external=[]
-    if not unique and os.getenv('GOOGLE_PLACES_API_KEY') and os.getenv('DISCOVERY_ON_MISS','false').lower()=='true':
-        try:
-            places=await discover_places(area)
-            from .agents import distance_km
-            for place in places:
-                location=place.get('location',{})
-                if 'latitude' not in location or 'longitude' not in location:continue
-                distance=distance_km(lat,lng,location['latitude'],location['longitude'])
-                if distance<=intent.radius_km:external.append({'name':place.get('displayName',{}).get('text','Unnamed restaurant'),'address':place.get('formattedAddress',''),'distance_km':round(distance,2),'maps_url':place.get('googleMapsUri',''),'notice':'Google Places discovery only; dish availability and menu prices are unknown.'})
-        except Exception:
-            logging.warning('External discovery unavailable; returning database results only')
-    return {'external_discovery':external,'attribution':attribution(search_record),'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': ('No matching priced menu was found. Try a larger radius or budget, or another dish.' if body.query and not unique else None) or ('What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None),
+    return {'external_discovery':[],'attribution':attribution(search_record),'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': ('No matching priced menu was found. Try a larger radius or budget, or another dish.' if body.query and not unique else None) or ('What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None),
             'coverage':'Partial Mumbai coverage; source-observed prices require confirmation. Samples are fictional.',
             'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km), 'catalog':catalog_coverage(db)}
 
@@ -409,17 +418,16 @@ def source_jobs(rid:int,user=Depends(owner),db=Depends(db_session)):
 
 def unpriced_nearby(db,lat,lng,radius):
     from .agents import distance_km
-    rows=db.scalars(select(Restaurant).where(Restaurant.sample.is_(False))).all()
+    from .geo import candidates
+    fresh_item=select(MenuItem.id).outerjoin(MenuEvidence,MenuEvidence.menu_item_id==MenuItem.id).where(
+        MenuItem.restaurant_id==Restaurant.id,MenuItem.available.is_(True),
+        or_(MenuEvidence.menu_item_id.is_(None),and_(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now()))).exists()
+    query=select(Restaurant).where(Restaurant.sample.is_(False),~fresh_item)
+    rows=db.scalars(candidates(db,query,lat,lng,radius)).all()
     output=[]
     for restaurant in rows:
         distance=distance_km(lat,lng,restaurant.latitude,restaurant.longitude)
-        if distance>radius:continue
-        items=db.scalars(select(MenuItem).where(MenuItem.restaurant_id==restaurant.id,MenuItem.available.is_(True))).all()
-        fresh=False
-        for item in items:
-            evidence=db.get(MenuEvidence,item.id)
-            if evidence is None or (evidence.active and evidence.expires_at>now()):fresh=True
-        if not fresh:output.append({'restaurant':public(restaurant),'distance_km':round(distance,2),'notice':'Menu price unavailable or stale. This is not a confirmed dish/budget match.'})
+        if distance<=radius:output.append({'restaurant':public(restaurant),'distance_km':round(distance,2),'notice':'Menu price unavailable or stale. This is not a confirmed dish/budget match.'})
     return sorted(output,key=lambda row:row['distance_km'])[:20]
 
 def menu_details(db,item):

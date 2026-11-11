@@ -90,3 +90,41 @@ def test_approved_link_discovery_and_menu_classification(monkeypatch):
     html='<a href="/menu">Food</a><a href="https://evil.example/menu">Bad</a><a href="/menu.pdf">PDF</a>'
     assert menu_candidates(html,'https://menu.example.test')==['https://menu.example.test/menu']
     assert classify('Mango lassi')=='Drinks'
+
+
+def test_health_remains_responsive_while_search_database_work_is_waiting(client,monkeypatch):
+    import threading
+    from concurrent.futures import ThreadPoolExecutor
+    import app.main as main
+    entered=threading.Event();release=threading.Event();original=main.search_database
+    def waiting(*args):
+        entered.set()
+        assert release.wait(10)
+        return original(*args)
+    monkeypatch.setattr(main,'search_database',waiting)
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        search=pool.submit(client.post,'/search',json={'query':'Chinese'})
+        assert entered.wait(3)
+        try:
+            health=pool.submit(client.get,'/health')
+            assert health.result(timeout=2).status_code==200
+        finally:release.set()
+        assert search.result(timeout=5).status_code==200
+
+
+def test_unpriced_catalog_does_not_issue_one_query_per_restaurant(client):
+    from sqlalchemy import event
+    from app.database import engine
+    from app.main import unpriced_nearby
+    with Session() as db:
+        for number in range(80):db.add(Restaurant(name=f'Unpriced fixture {number}',address='Bandra test fixture',area='Bandra',latitude=19.0596,longitude=72.8295,cuisine='Chinese'))
+        db.commit()
+    queries=[]
+    def record(connection,cursor,statement,*args):
+        if statement.lstrip().upper().startswith('SELECT'):queries.append(statement)
+    event.listen(engine,'before_cursor_execute',record)
+    try:
+        with Session() as db:rows=unpriced_nearby(db,19.0596,72.8295,2)
+        assert len(rows)==20
+        assert len(queries)<=2
+    finally:event.remove(engine,'before_cursor_execute',record)

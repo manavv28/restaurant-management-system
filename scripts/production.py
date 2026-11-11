@@ -36,12 +36,23 @@ try:
         except (URLError,TimeoutError): pass
         if time.monotonic()>deadline: raise RuntimeError('Backend readiness timed out')
         time.sleep(.5)
+    env={**os.environ,'HOSTNAME':'0.0.0.0','PORT':os.getenv('PORT','10000')}
+    frontend=subprocess.Popen(['node','server.js'],cwd=ROOT/'frontend',env=env,start_new_session=True)
+    children.append(frontend)
+    deadline=time.monotonic()+90
+    while True:
+        if frontend.poll() is not None:raise RuntimeError('Frontend exited during startup')
+        try:
+            with urlopen('http://127.0.0.1:'+env['PORT']+'/api/health',timeout=2) as response:
+                if response.status==200:break
+        except (URLError,TimeoutError):pass
+        if time.monotonic()>deadline:raise RuntimeError('Frontend readiness timed out')
+        time.sleep(.5)
+    # Bind and verify the public service before background imports compete for Free-plan CPU.
     if os.getenv('CATALOG_WORKER_ENABLED','false').lower()=='true':
         children.append(subprocess.Popen([sys.executable,'-m','app.catalog_worker','--seed-osm','--loop'],cwd=ROOT/'backend',start_new_session=True))
     if os.getenv('RETENTION_WORKER_ENABLED','true').lower()=='true':
         children.append(subprocess.Popen([sys.executable,'-m','app.maintenance'],cwd=ROOT/'backend',start_new_session=True))
-    env={**os.environ,'HOSTNAME':'0.0.0.0','PORT':os.getenv('PORT','10000')}
-    children.append(subprocess.Popen(['node','server.js'],cwd=ROOT/'frontend',env=env,start_new_session=True))
     while all(child.poll() is None for child in children): time.sleep(.5)
     raise SystemExit(next((c.returncode or 1 for c in children if c.poll() is not None),1))
 except KeyboardInterrupt: pass

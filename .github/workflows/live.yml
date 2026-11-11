@@ -2,6 +2,7 @@ name: BiteAI public release verification
 on:
   push:
     branches: [deploy/biteai-mvp]
+    paths-ignore: ['docs/**','README.md','.github/**']
   workflow_dispatch:
 permissions:
   contents: read
