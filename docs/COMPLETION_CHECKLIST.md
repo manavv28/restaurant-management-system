@@ -38,6 +38,8 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 
 ## Requires external configuration or evidence
 
+See [REQUIRED_CONFIGURATION.md](REQUIRED_CONFIGURATION.md) for the exact inputs, secure environment-variable placement, and follow-up validation.
+
 - [ ] Approve restaurant website domains, collect real menus/prices, and verify the complete real dish/budget-match journey. Discovery metadata is present, but source-backed menu-price coverage is currently zero; prices cannot be fabricated or collected from unapproved hosts.
 - [ ] Configure Gemini and Google Places keys and validate real provider responses/quotas. Optional Google Maps rendering requires a referrer-restricted browser key. Deterministic text search and Leaflet work without these keys.
 - [ ] Configure TLS SMTP, sender identity and PUBLIC_APP_URL; verify actual email delivery and a real verification/reset email. No email was sent to a real user during tests.
