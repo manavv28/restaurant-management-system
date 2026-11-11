@@ -170,15 +170,18 @@ test('a delayed account refresh cannot overwrite a consent change',async({page})
  let release:()=>void=()=>{};
  const gate=new Promise<void>(resolve=>{release=resolve});
  let seen:()=>void=()=>{};const requested=new Promise<void>(resolve=>{seen=resolve});
+ let settled:()=>void=()=>{};const finished=new Promise<void>(resolve=>{settled=resolve});
  await page.route('**/api/me',async route=>{
   const response=await route.fetch();const body=await response.json();
   if(body.consent===false){seen();await gate;await route.fulfill({response,json:body})}else await route.fulfill({response});
- });
+  settled();
+ },{times:1});
  await page.getByRole('button',{name:'Your space'}).click();await requested;
  try{
   const update=page.waitForResponse(response=>response.url().endsWith('/api/me/consent')&&response.request().method()==='PUT');
   await page.getByLabel('I consent to payment-data processing').check();
   expect((await update).ok()).toBeTruthy();
  }finally{release()}
+ await finished;
  await expect(page.getByLabel('I consent to payment-data processing')).toBeChecked();
 });
