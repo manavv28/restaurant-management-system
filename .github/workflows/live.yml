@@ -19,14 +19,14 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - run: npm ci
         working-directory: frontend
-      - run: npx playwright install --with-deps chromium
+      - run: google-chrome --version
         working-directory: frontend
       - name: Verify the deployed public origin with certificate validation enabled
         working-directory: frontend
         env:
           LIVE_BASE_URL: https://restaurant-management-system-qxtx.vercel.app
           EXPECTED_RELEASE: ${{ github.sha }}
-        run: CHROMIUM_PATH=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())") npx playwright test --config playwright.live.config.ts
+        run: CHROMIUM_PATH=$(command -v google-chrome) npx playwright test --config playwright.live.config.ts
       - uses: actions/upload-artifact@v4
         if: always()
         with:

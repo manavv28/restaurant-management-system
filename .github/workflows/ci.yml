@@ -60,7 +60,7 @@ jobs:
         working-directory: frontend
       - run: npm run build
         working-directory: frontend
-      - run: npx playwright install --with-deps chromium
+      - run: google-chrome --version
         working-directory: frontend
       - name: Run browser journeys against isolated sample data
         run: |
@@ -71,7 +71,7 @@ jobs:
             sleep 1
           done
           cd frontend
-          CHROMIUM_PATH=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())") npx playwright test
+          CHROMIUM_PATH=$(command -v google-chrome) npx playwright test
       - name: Build the actual production image
         run: docker build -t biteai:ci .
       - name: Smoke-test the image against migrated PostgreSQL
