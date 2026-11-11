@@ -19,7 +19,7 @@ services:
       - key: AUTO_CREATE_SCHEMA
         value: "false"
       - key: CATALOG_WORKER_ENABLED
-        value: "false"
+        value: "true"
       - key: SEED_SAMPLE_DATA
         value: "false"
       - key: ENABLE_PAYMENT_SIMULATION

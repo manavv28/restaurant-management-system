@@ -25,15 +25,16 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 - [x] Retention worker runs every six hours while Render is awake; structured request IDs and sanitized server-error logs support diagnosis. No always-on worker is promised.
 - [x] Isolated pg_dump/pg_restore rehearsal: 378 records, matching complete-row hash.
 - [x] Legacy Render database inspected read-only: zero users/favourites/transactions; six sample restaurants and sample campaigns. Nothing was deleted or automatically transferred.
-- [x] Backend PostgreSQL suite: **56 passed**. SQLite suite and browser results are in the current work report; nine browser journeys cover core flows, cookie revocation, location permission/denial, voice adapter/fallback and checkout-status behavior.
+- [x] Backend PostgreSQL suite: **56 passed**. SQLite suite and browser results are in the current work report; ten browser journeys cover core flows, cookie revocation, location permission/denial, voice adapter/fallback and checkout-status behavior.
 - [x] Production frontend build/TypeScript checks passed.
 - [x] CI runs PostgreSQL/schema/transfer tests, browser journeys, the actual production Docker build and image smoke checks on a hosted builder.
 
 ## Hosting verification in progress
 
-- [ ] Confirm hosted CI image build and non-root database-backed image smoke check.
-- [ ] Merge the reviewed integration into the deployment branch and deploy matching revisions to Render and the selected Vercel project.
-- [ ] Verify deployed revision, Supabase TLS, real catalog, secure cookies, owner isolation and monitored health on both public origins.
+- [x] Hosted CI image build and non-root database-backed image smoke check passed: Actions run 42984898701.
+- [x] PRs #4 and #3 merged into deploy/biteai-mvp; matching release deployed to Render and the selected Vercel production project.
+- [x] Both public API origins verified: matching release, Supabase verify-full TLS, real catalog/freshness, Secure/HttpOnly/SameSite cookies, CSRF, consent persistence, owner isolation, login and logout/replay rejection.
+- [ ] Hosted live-browser check is running to verify the public mobile UI with normal certificate validation. Local external-browser automation hit environment CA/profile restrictions; TLS verification was never disabled.
 
 ## Requires external configuration or evidence
 
@@ -45,3 +46,11 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 - [ ] Confirm production backup availability/retention and rehearse recovery using a protected production backup. The completed restore rehearsal uses isolated public catalog data.
 
 The original MVP explicitly permits simulated payments and provider fallbacks. Those fallbacks do not establish real menu coverage, working email delivery, legal merchant approval or full production readiness.
+
+## Published verification checkpoint
+
+The implementation release `89f10fee1d96020e81b6c825969a314b0acfa403` was verified at both https://biteai-demo.onrender.com and https://restaurant-management-system-qxtx.vercel.app. Render's Free plan was confirmed after deployment. The actual deployed image includes retention and catalog workers; the catalog blueprint now preserves the enabled collection setting on future syncs. Live fixture accounts were removed after verification.
+
+GitHub Actions run https://github.com/manavv28/restaurant-management-system/actions/runs/42984898701 passed 56 PostgreSQL tests, all 10 browser journeys, production frontend build, actual Docker build and non-root image/database smoke test. SQLite passed 51 tests with 5 PostgreSQL-only skips. The separate public-release workflow captures a mobile screenshot and checks the current production origin without weakening browser certificate checks.
+
+The remaining unchecked external-configuration items above still prevent a full production-ready claim. The application runs with explicit provider fallbacks and unknown menu prices.
