@@ -28,7 +28,11 @@ def throttle_auth(db,request,email):
     throttle(db,'auth-connection',request.client.host if request.client else 'unknown',200)
     throttle(db,'auth-account',email.strip().lower())
 
-def mail_enabled():return bool(os.getenv('SMTP_HOST') and os.getenv('EMAIL_FROM') and os.getenv('PUBLIC_APP_URL'))
+def mail_enabled():
+    base=os.getenv('PUBLIC_APP_URL','')
+    return bool(os.getenv('SMTP_HOST') and os.getenv('EMAIL_FROM')
+                and urlsplit(base).scheme=='https'
+                and (not os.getenv('SMTP_USER') or os.getenv('SMTP_PASSWORD')))
 
 def send_security_email(email,purpose,token):
     if not mail_enabled():raise RuntimeError('Email delivery is not configured')

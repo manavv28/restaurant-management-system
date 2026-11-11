@@ -5,9 +5,9 @@ The application is deployed at https://restaurant-management-system-qxtx.vercel.
 ## Information you can provide in chat
 
 1. **Menu sources:** two or three restaurant menu URLs/domains you own or have permission to collect from. Alternatively, identify restaurant-authorized menu exports. Include which restaurant each source belongs to. This unlocks real dishes/prices and the complete budget-match journey; the 378 current OSM records contain no inferred menu prices.
-2. **Email sender:** a verified sender address/domain and the email provider you want to use. If DNS verification is required, identify the domain and where its DNS is managed.
-3. **Alert recipient:** the email address or existing alert destination that should receive incident notifications. Identify an existing monitoring account if you already have one.
-4. **Backup destination:** choose encrypted GitHub artifacts retained seven days as a free starting option, or name an existing private storage destination and desired retention. Confirm the destination before its backup workflow is configured. Keep the decryption key separately from backup files.
+2. **Email sender:** selected Gmail address **mantempp@gmail.com**. Gmail App Password setup and actual delivery verification remain pending; see [BACKUPS.md](BACKUPS.md).
+3. **Alert recipient:** selected **mantempp@gmail.com**. Daily health-check email automation is prepared; secure SMTP credentials and delivery verification remain pending.
+4. **Backup destination:** confirmed encrypted GitHub artifacts retained seven days. Workflow, secure secret names, recovery instructions and default-branch scheduling requirement are in [BACKUPS.md](BACKUPS.md). Keep the decryption secret separately from backup files.
 5. **Payments:** identify the onboarded restaurant/merchant and whether you have a Razorpay test account. Complete legal/KYC and settlement approval directly with the payment provider before any live charging.
 
 ## Secrets to enter through secure settings
@@ -54,7 +54,7 @@ Supported events: payment.captured, refund.processed, payment.dispute.created, p
 
 ## Production backup access
 
-A production backup/recovery test requires the existing Supabase session/direct connection credentials through a secure execution path and the chosen encrypted destination. The connected SQL management tool can inspect/migrate the schema, but an automated pg_dump workflow needs its own securely configured database credential. Exact workflow secret names will be documented when the destination is chosen. Do not send the database password or connection URL in chat.
+A production backup/recovery test requires the existing Supabase session/direct connection credentials through a secure execution path and the chosen encrypted destination. The connected SQL management tool can inspect/migrate the schema, but an automated pg_dump workflow needs its own securely configured database credential. Required secrets are now documented in [BACKUPS.md](BACKUPS.md). Do not send the database password or connection URL in chat.
 
 The completed restore rehearsal used isolated catalog data. It does not establish a protected, retained production backup. The legacy Render sample database remains intact.
 
