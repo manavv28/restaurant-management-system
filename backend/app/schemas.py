@@ -33,7 +33,10 @@ class RestaurantInput(BaseModel):
     phone: str = Field(default='',max_length=30)
     website: str = Field(default='',max_length=500)
     opening_hours: str = Field(default='Unknown',max_length=500)
-    @field_validator('website')
+    image_url: str = Field(default='',max_length=1000)
+    image_attribution: str = Field(default='',max_length=500)
+    ordering_url: str = Field(default='',max_length=1000)
+    @field_validator('website','image_url','ordering_url')
     @classmethod
     def safe_url(cls,value):
         if value and not value.startswith('https://'): raise ValueError('Use an HTTPS website')
@@ -79,3 +82,16 @@ class MenuSourceInput(BaseModel):
 
 class SourceState(BaseModel):
     enabled: bool
+
+
+class ClickInput(BaseModel):
+    attribution: str | None = Field(default=None,max_length=1000)
+
+class EmailInput(BaseModel):
+    email: str = Field(max_length=254,pattern=r'^[^\s@]+@[^\s@]+\.[^\s@]+$')
+
+class TokenInput(BaseModel):
+    token: str = Field(min_length=20,max_length=200)
+
+class ResetInput(TokenInput):
+    password: str = Field(min_length=10,max_length=128)

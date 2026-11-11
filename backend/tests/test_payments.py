@@ -71,3 +71,26 @@ def test_malformed_signed_event_is_bad_request(client,monkeypatch):
         raw=json.dumps(event).encode()
         response=client.post('/payments/webhook',content=raw,headers={'x-razorpay-signature':hmac.new(b'fixture-secret',raw,hashlib.sha256).hexdigest()})
         assert response.status_code==400
+
+
+def test_signed_refund_and_dispute_adjust_verified_eligibility(client,monkeypatch):
+    auth=account(client);owner=account(client,'refund-owner@example.test','owner');rid=restaurant(client,owner)
+    uid=client.get('/me',headers=auth).json()['id']
+    with Session() as db:
+        db.add(Transaction(user_id=uid,restaurant_id=rid,reference='razorpay:pay_RefundFixture',amount_paise=30000,simulated=False));db.commit()
+    monkeypatch.setenv('RAZORPAY_WEBHOOK_SECRET','fixture-secret')
+    def send(event,identifier,amount=10000,timestamp=0):
+        entity={'id':identifier,'payment_id':'pay_RefundFixture','amount':amount,'currency':'INR'}
+        payload={'event':event,'created_at':timestamp,'payload':{'refund' if event=='refund.processed' else 'dispute':{'entity':entity}}}
+        raw=json.dumps(payload).encode()
+        return client.post('/payments/webhook',content=raw,headers={'x-razorpay-signature':hmac.new(b'fixture-secret',raw,hashlib.sha256).hexdigest()})
+    assert send('refund.processed','rfnd_Test').json()['status']=='adjusted'
+    assert send('refund.processed','rfnd_Test').json()['status']=='duplicate'
+    assert client.get('/me',headers=auth).json()['verified_spend_paise']==20000
+    assert send('refund.processed','rfnd_TooMuch',25000).status_code==409
+    assert send('payment.dispute.created','disp_Test',20000,100).json()['disputed']
+    assert client.get('/me',headers=auth).json()['verified_spend_paise']==0
+    assert not send('payment.dispute.won','disp_Test',20000,200).json()['disputed']
+    assert client.get('/me',headers=auth).json()['verified_spend_paise']==20000
+    # A delayed old dispute event must not undo a newer resolution.
+    assert not send('payment.dispute.lost','disp_Test',20000,150).json()['disputed']

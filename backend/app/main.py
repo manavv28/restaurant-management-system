@@ -6,10 +6,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select, func, delete
 from sqlalchemy.exc import IntegrityError
 from .database import *
-from .security import db_session, current_user, optional_user, owner, passwords, sign_in, COOKIE
+from .security import db_session, current_user, optional_user, owner, passwords, sign_in, COOKIE, verified_user
 from .schemas import *
 from .agents import AREAS, understand, menu_search, discover_places, clean_places
+from .insights import router as insights_router,attribution,resolve_attribution
+from .ownership import router as ownership_router
 from .seed import seed
+from .account_security import router as security_router
 logging.basicConfig(level=logging.INFO)
 
 @asynccontextmanager
@@ -27,6 +30,9 @@ async def lifespan(app):
     yield
 
 app = FastAPI(title='BiteAI API',version='0.1.0',lifespan=lifespan)
+app.include_router(security_router)
+app.include_router(insights_router)
+app.include_router(ownership_router)
 app.add_middleware(CORSMiddleware,allow_origins=os.getenv('CORS_ORIGINS','http://localhost:3000,http://127.0.0.1:3000').split(','),allow_methods=['GET','POST','PUT','DELETE'],allow_headers=['Authorization','Content-Type'])
 
 @app.middleware('http')
@@ -37,7 +43,15 @@ async def browser_security(request: Request, call_next):
         # Only same-origin rewrites are supported for browser authentication.
         if request.headers.get('x-biteai-client') != 'browser' or request.headers.get('sec-fetch-site') == 'cross-site':
             return JSONResponse({'detail':'Browser request verification failed'},status_code=403)
-    response = await call_next(request)
+    import time
+    started=time.monotonic();request_id=uuid.uuid4().hex
+    try:response = await call_next(request)
+    except Exception:
+        logging.error('request_failed request_id=%s method=%s path=%s',request_id,request.method,request.url.path)
+        from starlette.responses import JSONResponse
+        return JSONResponse({'detail':'Request failed. Please try again.','request_id':request_id},status_code=500)
+    response.headers['X-Request-ID']=request_id
+    if response.status_code>=500:logging.error('request_error request_id=%s status=%s elapsed_ms=%d',request_id,response.status_code,int((time.monotonic()-started)*1000))
     if request.url.path.startswith(('/auth','/me','/portal','/payments')):
         response.headers['Cache-Control'] = 'no-store'
     return response
@@ -64,10 +78,10 @@ def owned(db,rid,user):
 
 def stats(db,user_id,restaurant_id=None):
     searches = db.scalar(select(func.count()).select_from(Search).where(Search.user_id==user_id)) or 0
-    tx = select(Transaction).where(Transaction.user_id==user_id,Transaction.simulated.is_(False))
+    tx = select(Transaction).where(Transaction.user_id==user_id,Transaction.simulated.is_(False),Transaction.disputed.is_(False),Transaction.refunded_paise<Transaction.amount_paise)
     if restaurant_id: tx = tx.where(Transaction.restaurant_id==restaurant_id)
     transactions = db.scalars(tx).all()
-    return {'searches':searches,'verified_spend_paise':sum(t.amount_paise for t in transactions),'verified_visits':len(transactions)}
+    return {'searches':searches,'verified_spend_paise':sum(t.amount_paise-t.refunded_paise for t in transactions),'verified_visits':len(transactions)}
 
 def eligibility(db,user,campaign):
     state = stats(db,user.id,campaign.restaurant_id)
@@ -84,10 +98,12 @@ def eligibility(db,user,campaign):
 @app.get('/health')
 def health(db=Depends(db_session)):
     db.execute(select(1))
-    return {'status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local rules','google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'provider configured; merchant onboarding required' if all(os.getenv(k) for k in ('RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET')) else 'provider unavailable', 'payment_simulation':os.getenv('ENABLE_PAYMENT_SIMULATION','true' if os.getenv('APP_ENV')!='production' else 'false').lower()=='true'}
+    return {'release':os.getenv('RENDER_GIT_COMMIT',os.getenv('RELEASE_SHA','development'))[:12],'database_provider':'Supabase' if (database_url.host or '').endswith(('.supabase.co','.pooler.supabase.com')) else engine.dialect.name,'database_tls':database_url.query.get('sslmode','local'),'retention_worker':os.getenv('RETENTION_WORKER_ENABLED','true').lower()=='true','status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local rules','google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'provider configured; merchant onboarding required' if all(os.getenv(k) for k in ('RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET')) else 'provider unavailable', 'payment_simulation':os.getenv('ENABLE_PAYMENT_SIMULATION','true' if os.getenv('APP_ENV')!='production' else 'false').lower()=='true'}
 
 @app.post('/auth/register')
 def register(body:Register,request:Request,response:Response,db=Depends(db_session)):
+    from .account_security import throttle_auth
+    throttle_auth(db,request,body.email)
     user = User(email=body.email.strip().lower(),name=body.name.strip(),password_hash=passwords.hash(body.password),role=body.role)
     db.add(user)
     try: db.commit()
@@ -97,6 +113,8 @@ def register(body:Register,request:Request,response:Response,db=Depends(db_sessi
 
 @app.post('/auth/login')
 def login(body:Login,request:Request,response:Response,db=Depends(db_session)):
+    from .account_security import throttle_auth
+    throttle_auth(db,request,body.email)
     user = db.scalar(select(User).where(User.email==body.email.strip().lower()))
     if not user or not passwords.verify(body.password,user.password_hash): raise HTTPException(401,'Incorrect email or password')
     return {**sign_in(user,db,request,response),'user':public(user)}
@@ -131,7 +149,7 @@ async def search(body:SearchInput,user=Depends(optional_user),db=Depends(db_sess
         offers = []
         for c in db.scalars(select(Campaign).where(Campaign.restaurant_id==r.id)).all():
             if user and eligibility(db,user,c)['eligible']: offers.append(public(c))
-        results.append({'restaurant':public(r),'dish':public(item),'distance_km':round(distance,2),'offers':offers,
+        results.append({'restaurant':public(r),'dish':menu_details(db,item),'distance_km':round(distance,2),'offers':offers,
             'reason':f"{item.name} is within your ₹{intent.max_budget} budget and {intent.radius_km:g} km radius. "+('Fictional sample listing.' if r.sample else 'Owner supplied menu; price not independently verified.')})
     # One best matching dish per restaurant.
     unique = list({row['restaurant']['id']:row for row in reversed(results)}.values())[::-1]
@@ -143,7 +161,19 @@ async def search(body:SearchInput,user=Depends(optional_user),db=Depends(db_sess
     for match in unique:
         db.add(SearchMatch(search_id=search_record.id,restaurant_id=match['restaurant']['id'],menu_item_id=match['dish']['id'],price_paise=match['dish']['price_paise'],distance_km=match['distance_km'],source=match['dish']['source']))
     db.commit()
-    return {'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': 'What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None,
+    external=[]
+    if not unique and os.getenv('GOOGLE_PLACES_API_KEY') and os.getenv('DISCOVERY_ON_MISS','false').lower()=='true':
+        try:
+            places=await discover_places(area)
+            from .agents import distance_km
+            for place in places:
+                location=place.get('location',{})
+                if 'latitude' not in location or 'longitude' not in location:continue
+                distance=distance_km(lat,lng,location['latitude'],location['longitude'])
+                if distance<=intent.radius_km:external.append({'name':place.get('displayName',{}).get('text','Unnamed restaurant'),'address':place.get('formattedAddress',''),'distance_km':round(distance,2),'maps_url':place.get('googleMapsUri',''),'notice':'Google Places discovery only; dish availability and menu prices are unknown.'})
+        except Exception:
+            logging.warning('External discovery unavailable; returning database results only')
+    return {'external_discovery':external,'attribution':attribution(search_record),'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': ('No matching priced menu was found. Try a larger radius or budget, or another dish.' if body.query and not unique else None) or ('What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None),
             'coverage':'Partial Mumbai coverage; source-observed prices require confirmation. Samples are fictional.',
             'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km), 'catalog':catalog_coverage(db)}
 
@@ -153,8 +183,13 @@ def restaurant(rid:int,db=Depends(db_session)):
     return {'restaurant':public(r),'menu':[menu_details(db,m) for m in db.scalars(select(MenuItem).where(MenuItem.restaurant_id==rid)).all()]}
 
 @app.post('/restaurants/{rid}/click')
-def click(rid:int,db=Depends(db_session)):
-    restaurant_or_404(db,rid); db.add(Interaction(restaurant_id=rid)); db.commit()
+def click(rid:int,body:ClickInput|None=None,user=Depends(optional_user),db=Depends(db_session)):
+    restaurant_or_404(db,rid)
+    sid=resolve_attribution(db,body.attribution,rid,user) if body and body.attribution else None
+    if sid and db.scalar(select(Interaction.id).where(Interaction.search_id==sid,Interaction.restaurant_id==rid)):return {'recorded':True}
+    db.add(Interaction(restaurant_id=rid,search_id=sid))
+    try:db.commit()
+    except IntegrityError:db.rollback()
     return {'recorded':True}
 
 @app.get('/me/history')
@@ -213,7 +248,7 @@ def redemptions(user=Depends(current_user),db=Depends(db_session)):
     return [public(r) for r in db.scalars(select(Redemption).where(Redemption.user_id==user.id)).all()]
 
 @app.post('/campaigns/{cid}/redeem')
-def redeem(cid:int,body:RedeemInput,user=Depends(current_user),db=Depends(db_session)):
+def redeem(cid:int,body:RedeemInput,user=Depends(verified_user),db=Depends(db_session)):
     # Serialize each user's redemptions on PostgreSQL; unique sequence protects SQLite races.
     db.scalar(select(User).where(User.id==user.id).with_for_update())
     c = db.get(Campaign,cid)
@@ -242,6 +277,10 @@ def create_restaurant(body:RestaurantInput,user=Depends(owner),db=Depends(db_ses
 def update_restaurant(rid:int,body:RestaurantInput,user=Depends(owner),db=Depends(db_session)):
     r=owned(db,rid,user)
     for k,v in body.model_dump().items(): setattr(r,k,v)
+    from urllib.parse import urlsplit
+    proof=db.get(OwnershipProof,rid)
+    if proof and urlsplit(r.website).hostname!=proof.hostname:
+        r.ownership_verified=False;db.delete(proof)
     r.updated_at=now(); db.commit(); return public(r)
 
 @app.post('/portal/restaurants/{rid}/menu')

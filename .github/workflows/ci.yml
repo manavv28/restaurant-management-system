@@ -1,0 +1,97 @@
+name: BiteAI integration
+on:
+  push:
+    branches: [main, deploy/biteai-mvp, 'completion/**', 'recovery/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: isolated-ci-fixture
+          POSTGRES_DB: biteai_api_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd 'pg_isready -U postgres'
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres:isolated-ci-fixture@127.0.0.1:5432/biteai_migrations_test
+      TEST_DATABASE_URL: postgresql+psycopg://postgres:isolated-ci-fixture@127.0.0.1:5432/biteai_api_test
+      MIGRATION_TEST_DATABASE_URL: postgresql+psycopg://postgres:isolated-ci-fixture@127.0.0.1:5432/biteai_migrations_test
+      TRANSFER_TEST_SOURCE_URL: postgresql+psycopg://postgres:isolated-ci-fixture@127.0.0.1:5432/biteai_transfer_source_test
+      TRANSFER_TEST_TARGET_URL: postgresql+psycopg://postgres:isolated-ci-fixture@127.0.0.1:5432/biteai_transfer_target_test
+      JWT_SECRET: isolated-ci-secret-not-for-production-0123456789
+      PYTHONPATH: backend
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: pip install -r backend/requirements.txt
+      - name: Prepare isolated PostgreSQL databases and browser roles
+        run: |
+          python - <<'PY'
+          import psycopg
+          with psycopg.connect('postgresql://postgres:isolated-ci-fixture@127.0.0.1:5432/biteai_api_test',autocommit=True) as db:
+              db.execute('CREATE ROLE anon')
+              db.execute('CREATE ROLE authenticated')
+              for name in ('biteai_migrations_test','biteai_transfer_source_test','biteai_transfer_target_test'):
+                  db.execute('CREATE DATABASE '+name)
+          PY
+      - name: Apply migrations and verify idempotence
+        run: |
+          MIGRATIONS_DIR=supabase/migrations python -m app.cloud_run migrate
+          MIGRATIONS_DIR=supabase/migrations python -m app.cloud_run migrate
+          python -m app.adopt_migrations
+      - run: pytest -q backend/tests
+      - run: npm ci
+        working-directory: frontend
+      - run: npm run build
+        working-directory: frontend
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Run browser journeys against isolated sample data
+        run: |
+          DATABASE_URL=sqlite:////tmp/biteai-browser.sqlite python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 > /tmp/biteai-api.log 2>&1 &
+          npm --prefix frontend run dev > /tmp/biteai-web.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:3000/api/health >/dev/null; then break; fi
+            sleep 1
+          done
+          cd frontend
+          CHROMIUM_PATH=$(node -e "process.stdout.write(require('playwright').chromium.executablePath())") npx playwright test
+      - name: Build the actual production image
+        run: docker build -t biteai:ci .
+      - name: Smoke-test the image against migrated PostgreSQL
+        run: |
+          docker run -d --name biteai-ci --add-host=host.docker.internal:host-gateway -p 10000:10000 \
+            -e DATABASE_URL=postgresql+psycopg://postgres:isolated-ci-fixture@host.docker.internal:5432/biteai_migrations_test \
+            -e JWT_SECRET=isolated-ci-secret-not-for-production-0123456789 biteai:ci
+          for attempt in $(seq 1 45); do
+            if curl -fsS http://127.0.0.1:10000/api/health > /tmp/biteai-health.json; then break; fi
+            sleep 1
+          done
+          python - <<'PY'
+          import json
+          result=json.load(open('/tmp/biteai-health.json'))
+          assert result['status']=='ok' and result['database']=='connected'
+          assert result['payment_simulation'] is False
+          PY
+          test "$(docker exec biteai-ci id -u)" = 10001
+      - name: Capture failure diagnostics
+        if: failure()
+        run: |
+          cat /tmp/biteai-api.log /tmp/biteai-web.log 2>/dev/null || true
+          docker logs biteai-ci 2>/dev/null || true

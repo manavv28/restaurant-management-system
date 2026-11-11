@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, event, String, Float, Integer, Boolean, ForeignKey, Text, UniqueConstraint
+from sqlalchemy import create_engine, event, String, Float, Integer, Boolean, ForeignKey, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 def now():
@@ -27,6 +27,7 @@ class User(Base):
     password_hash: Mapped[str] = mapped_column(Text)
     role: Mapped[str] = mapped_column(String(20), default='customer')
     consent: Mapped[bool] = mapped_column(Boolean, default=False)
+    email_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text('false'))
 class Restaurant(Base):
     __tablename__ = 'restaurants'
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -41,6 +42,11 @@ class Restaurant(Base):
     phone: Mapped[str] = mapped_column(String(30), default='')
     website: Mapped[str] = mapped_column(Text, default='')
     rating: Mapped[float | None] = mapped_column(Float, nullable=True)
+    review_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    image_url: Mapped[str] = mapped_column(Text, default='', server_default='')
+    image_attribution: Mapped[str] = mapped_column(Text, default='', server_default='')
+    ordering_url: Mapped[str] = mapped_column(Text, default='', server_default='')
+    ownership_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text('false'))
     opening_hours: Mapped[str] = mapped_column(Text, default='Unknown')
     price_range: Mapped[str] = mapped_column(String(40), default='Unknown')
     source: Mapped[str] = mapped_column(Text, default='Owner supplied; unverified')
@@ -100,6 +106,9 @@ class Transaction(Base):
     reference: Mapped[str] = mapped_column(String(100), unique=True)
     amount_paise: Mapped[int] = mapped_column(Integer)
     simulated: Mapped[bool] = mapped_column(Boolean, default=True)
+    refunded_paise: Mapped[int] = mapped_column(Integer, default=0, server_default=text('0'))
+    disputed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text('false'))
+    dispute_updated_at: Mapped[int] = mapped_column(Integer, default=0, server_default=text('0'))
     created_at: Mapped[str] = mapped_column(String(40), default=now)
 class Redemption(Base):
     __tablename__ = 'redemptions'
@@ -114,6 +123,7 @@ class Redemption(Base):
     created_at: Mapped[str] = mapped_column(String(40), default=now)
 class Interaction(Base):
     __tablename__ = 'interactions'
+    search_id: Mapped[int | None] = mapped_column(ForeignKey('searches.id', ondelete='SET NULL'), nullable=True, index=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'), index=True)
     created_at: Mapped[str] = mapped_column(String(40), default=now)
@@ -207,3 +217,38 @@ class AuthSession(Base):
     id: Mapped[str] = mapped_column(String(64), primary_key=True)
     user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
     expires_at: Mapped[str] = mapped_column(String(40), index=True)
+
+
+class SecurityToken(Base):
+    __tablename__ = 'security_tokens'
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'), index=True)
+    purpose: Mapped[str] = mapped_column(String(30))
+    expires_at: Mapped[str] = mapped_column(String(40), index=True)
+
+class RateLimit(Base):
+    __tablename__ = 'rate_limits'
+    key: Mapped[str] = mapped_column(String(64), primary_key=True)
+    attempts: Mapped[int] = mapped_column(Integer)
+    expires_at: Mapped[str] = mapped_column(String(40), index=True)
+
+class OwnershipProof(Base):
+    __tablename__ = 'ownership_proofs'
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'), primary_key=True)
+    token_hash: Mapped[str] = mapped_column(String(64))
+    hostname: Mapped[str] = mapped_column(String(254))
+    expires_at: Mapped[str] = mapped_column(String(40))
+    verified_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+
+Index('one_attributed_click_per_match', Interaction.search_id, Interaction.restaurant_id, unique=True,
+      sqlite_where=text('search_id IS NOT NULL'), postgresql_where=text('search_id IS NOT NULL'))
+
+
+class PaymentAdjustment(Base):
+    __tablename__ = 'payment_adjustments'
+    id: Mapped[int] = mapped_column(primary_key=True)
+    transaction_id: Mapped[int] = mapped_column(ForeignKey('transactions.id', ondelete='CASCADE'), index=True)
+    reference: Mapped[str] = mapped_column(String(180), unique=True)
+    kind: Mapped[str] = mapped_column(String(40))
+    amount_paise: Mapped[int] = mapped_column(Integer)
+    created_at: Mapped[str] = mapped_column(String(40), default=now)
