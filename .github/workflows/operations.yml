@@ -1,0 +1,58 @@
+name: BiteAI encrypted backup and health
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 2 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: biteai-operations
+  cancel-in-progress: false
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BACKUP_DATABASE_URL: ${{ secrets.BACKUP_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      SUPABASE_CA_PEM: ${{ secrets.SUPABASE_CA_PEM }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: deploy/biteai-mvp
+      - name: Validate configuration
+        run: |
+          test -n "$BACKUP_DATABASE_URL" && test -n "$BACKUP_PASSPHRASE" && test -n "$SUPABASE_CA_PEM" || { echo 'Configure the three backup secrets documented in docs/BACKUPS.md'; exit 1; }
+      - name: Encrypted public-schema dump using PostgreSQL 17
+        run: |
+          umask 077
+          mkdir -p backups
+          printf '%s\n' "$SUPABASE_CA_PEM" > "$RUNNER_TEMP/supabase-ca.pem"
+          export PATH="/usr/lib/postgresql/17/bin:$PATH"
+          pg_dump --version | rg 'PostgreSQL\) 17\.'
+          export PGSSLMODE=verify-full PGSSLROOTCERT="$RUNNER_TEMP/supabase-ca.pem"
+          export GNUPGHOME="$RUNNER_TEMP/biteai-gnupg"
+          mkdir -m 700 "$GNUPGHOME"
+          python3 scripts/encrypted_backup.py backup backups/biteai.dump.gpg
+      - uses: actions/upload-artifact@v4
+        with:
+          name: biteai-encrypted-backup-${{ github.run_id }}
+          path: backups/*.gpg
+          retention-days: 7
+          if-no-files-found: error
+      - name: Remove runner backup and CA
+        if: always()
+        run: rm -rf backups "$RUNNER_TEMP/supabase-ca.pem" "$RUNNER_TEMP/biteai-gnupg"
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: deploy/biteai-mvp
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python scripts/check_health.py
+        env:
+          SMTP_PASSWORD: ${{ secrets.SMTP_PASSWORD }}
