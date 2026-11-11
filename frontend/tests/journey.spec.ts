@@ -160,3 +160,25 @@ test('discovery extras are honest and recovery reports unavailable email deliver
  await expect(page.getByText('Email delivery is not available yet. Please try again once the service is configured.')).toBeVisible();
  await expect(page.getByRole('button',{name:'Send reset link'})).toBeDisabled();
 });
+
+test('a delayed account refresh cannot overwrite a consent change',async({page})=>{
+ const headers={'X-BiteAI-Client':'browser'};
+ await page.request.post('/api/auth/register',{headers,data:{name:'Consent Race',email:`consent${Date.now()}@example.test`,password:'a-test-password-123'}});
+ await page.goto('/');await page.getByRole('button',{name:'Your space'}).click();
+ await expect(page.getByLabel('I consent to payment-data processing')).toBeVisible();
+ await page.getByRole('button',{name:'Discover',exact:true}).click();
+ let release:()=>void=()=>{};
+ const gate=new Promise<void>(resolve=>{release=resolve});
+ let seen:()=>void=()=>{};const requested=new Promise<void>(resolve=>{seen=resolve});
+ await page.route('**/api/me',async route=>{
+  const response=await route.fetch();const body=await response.json();
+  if(body.consent===false){seen();await gate;await route.fulfill({response,json:body})}else await route.fulfill({response});
+ });
+ await page.getByRole('button',{name:'Your space'}).click();await requested;
+ try{
+  const update=page.waitForResponse(response=>response.url().endsWith('/api/me/consent')&&response.request().method()==='PUT');
+  await page.getByLabel('I consent to payment-data processing').check();
+  expect((await update).ok()).toBeTruthy();
+ }finally{release()}
+ await expect(page.getByLabel('I consent to payment-data processing')).toBeChecked();
+});

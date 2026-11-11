@@ -1,5 +1,5 @@
 'use client';
-import {useState,useEffect,useCallback,FormEvent} from 'react';
+import {useState,useEffect,useCallback,useRef,FormEvent} from 'react';
 import dynamic from 'next/dynamic';
 import {FoodSuggestions,AnalyticsPanel,CampaignPerformance} from '../components/Insights';
 import {RecoveryForm,EmailVerification,OwnershipVerification} from '../components/AccountSecurity';
@@ -38,6 +38,7 @@ export default function Home(){
  const [owned,setOwned]=useState<Restaurant[]>([]),[selectedOwner,setSelectedOwner]=useState(0),[ownerMenu,setOwnerMenu]=useState<Dish[]>([]),[editDish,setEditDish]=useState<Dish|null>(null),[ownerAnalytics,setOwnerAnalytics]=useState<{restaurant_clicks:number;redemptions:number;discount_paise:number;campaigns:Offer[]}|null>(null);
  const [stats,setStats]=useState<{searches:number;average_budget:number;cuisines:{label:string;count:number}[]}|null>(null);
  const [busy,setBusy]=useState(false);
+ const accountVersion=useRef(0);
  const [simulation,setSimulation]=useState(false);
  useEffect(()=>{request<{payment_simulation:boolean}>('/health').then(h=>setSimulation(h.payment_simulation)).catch(()=>{})},[]);
  useEffect(()=>{
@@ -57,8 +58,12 @@ export default function Home(){
  document.addEventListener('keydown',handler);return()=>{document.removeEventListener('keydown',handler);previous?.focus()};
  },[auth,active]);
  const refreshAccount=useCallback(async()=>{
+   const version=++accountVersion.current;
+   try{
    const [me,o,h,t,f,r]=await Promise.all([request<User>('/me'),request<Offer[]>('/me/offers'),request<History[]>('/me/history'),request<Transaction[]>('/me/transactions'),request<Favourite[]>('/me/favourites'),request<typeof redemptions>('/me/redemptions')]);
+   if(version!==accountVersion.current)return;
    setUser(me);setOffers(o);setHistory(h);setTransactions(t);setFavourites(f);setRedemptions(r);
+   }catch(error){if(version===accountVersion.current)throw error}
  },[]);
  async function search(e?:FormEvent,override?:string){
    e?.preventDefault();setLoading(true);setError('');setSearched(true);
@@ -75,7 +80,7 @@ export default function Home(){
  async function action(task:()=>Promise<unknown>,success:string){setBusy(true);setError('');try{await task();setNotice(success)}catch(e){setError((e as Error).message)}finally{setBusy(false)}}
  async function authenticate(e:FormEvent<HTMLFormElement>){
   e.preventDefault();const values=Object.fromEntries(new FormData(e.currentTarget));
-  await action(async()=>{const r=await request<{user:User}>(register?'/auth/register':'/auth/login',post(values));setUser(r.user);setAuth(false);await refreshAccount()},'You’re signed in. Your next favourite is waiting.');
+  await action(async()=>{const r=await request<{user:User}>(register?'/auth/register':'/auth/login',post(values));accountVersion.current++;setUser(r.user);setAuth(false);await refreshAccount()},'You’re signed in. Your next favourite is waiting.');
  }
  function locate(){
   if(!navigator.geolocation){setError('Location is unavailable. Choose a Mumbai area instead.');return}
@@ -90,7 +95,7 @@ export default function Home(){
   const r=new C();r.lang='en-IN';r.onresult=e=>{const text=e.results[0][0].transcript;setQuery(text);search(undefined,text)};r.onend=()=>setListening(false);r.onerror=()=>{setListening(false);setError('Microphone unavailable. Please use text search.')};setListening(true);r.start();
  }
  async function save(rid:number,mid=0){if(!user){setAuth(true);return}await action(async()=>{await request('/me/favourites/'+rid+'?menu_item_id='+mid,post({}));await refreshAccount()},'Favourites updated.')}
- async function logout(){try{await request('/auth/logout',post({}))}catch(e){setError((e as Error).message);return}setUser(null);setOffers([]);setHistory([]);setFavourites([]);setTransactions([]);setRedemptions([]);setOwned([]);setSelectedOwner(0);setTab('discover')}
+ async function logout(){try{await request('/auth/logout',post({}))}catch(e){setError((e as Error).message);return}accountVersion.current++;setUser(null);setOffers([]);setHistory([]);setFavourites([]);setTransactions([]);setRedemptions([]);setOwned([]);setSelectedOwner(0);setTab('discover')}
  return <main>
  <header className="header"><a className="brand" href="/" aria-label="BiteAI home"><span className="brand-mark"><Utensils size={21}/></span>Bite<span>AI</span><small>MUMBAI</small></a>
  <nav aria-label="Main navigation">{[{id:'discover',label:'Discover',icon:Compass},{id:'dashboard',label:'Your space',icon:Heart},{id:'portal',label:'For restaurants',icon:Store}].map(n=><button key={n.id} onClick={()=>setTab(n.id)} className={tab===n.id?'nav-active':''}><n.icon size={16}/>{n.label}</button>)}</nav>
@@ -127,7 +132,7 @@ export default function Home(){
  <EmailVerification verified={user.email_verified} onVerified={()=>{void refreshAccount()}}/><h2>Your offers</h2><p className="subtle">Sample offers are demonstrations. Search activity never counts as a purchase.</p><div className="offer-grid">{offers.map(o=><article className="offer" key={o.id}><Gift/><span className="offer-percent">{o.percent}% off</span><h3>{o.title}</h3><p>{o.restaurant_name}</p><small>Minimum order {money(o.min_order_paise)} · capped at {money(o.max_discount_paise)}</small><p>{o.eligible?'You’re eligible':o.reasons?.join(' · ')}</p><form onSubmit={e=>{e.preventDefault();const amount=Number(new FormData(e.currentTarget).get('amount'));action(async()=>{await request('/campaigns/'+o.id+'/redeem',post({order_paise:Math.round(amount*100)}));await refreshAccount()},'Offer reserved. This is not a payment.')}}><label>Order value (₹)<input name="amount" type="number" min="1" step="0.01" defaultValue={300} required/></label><button className="primary" disabled={!o.eligible||busy}>Reserve offer</button></form></article>)}</div>
  <h2>Saved for your next craving</h2><div className="saved-list">{favourites.length?favourites.map(f=><button key={f.id} onClick={()=>openRestaurant(f.restaurant.id)}><Heart size={17}/>{f.restaurant.name}{f.dish?' · '+f.dish.name:''}<ArrowUpRight size={16}/></button>):<p className="subtle">Tap a heart on a restaurant or dish to save it here.</p>}</div>
  <div className="two-column"><section className="panel"><h2><Clock size={20}/> Recent cravings</h2>{history.slice(0,10).map(h=><div className="history-row" key={h.id}><div><b>{h.query||'Nearby food'}</b><small>{h.area} · {h.results} matches</small></div><button onClick={()=>{setQuery(h.query);setArea(h.area);setTab('discover');search(undefined,h.query)}} aria-label="Repeat search"><ArrowUpRight size={16}/></button></div>)}<button className="text-button" onClick={()=>action(async()=>{await request('/me/history',{method:'DELETE'});await refreshAccount()},'Search history deleted. Search-based offer eligibility has been recalculated.')}>Delete my search history</button></section>
- <section className="panel"><h2>Privacy & payment consent</h2><p className="subtle">No UPI PINs, OTPs or Google Pay passwords. BiteAI has no access to your payment history.</p><label className="consent"><input type="checkbox" checked={user.consent} disabled={busy} onChange={e=>{const consent=e.target.checked;setUser({...user,consent});action(async()=>{try{await request('/me/consent',{method:'PUT',body:JSON.stringify({consent})});await refreshAccount()}catch(e){setUser(user);throw e}},consent?'Payment-data consent enabled.':'Consent withdrawn.')}}/>I consent to payment-data processing</label>
+ <section className="panel"><h2>Privacy & payment consent</h2><p className="subtle">No UPI PINs, OTPs or Google Pay passwords. BiteAI has no access to your payment history.</p><label className="consent"><input type="checkbox" checked={user.consent} disabled={busy} onChange={e=>{const consent=e.target.checked;accountVersion.current++;setUser({...user,consent});action(async()=>{try{await request('/me/consent',{method:'PUT',body:JSON.stringify({consent})});await refreshAccount()}catch(e){setUser(user);throw e}},consent?'Payment-data consent enabled.':'Consent withdrawn.')}}/>I consent to payment-data processing</label>
  <form onSubmit={e=>{e.preventDefault();const data=new FormData(e.currentTarget);action(async()=>{await request('/payments/simulate',post({restaurant_id:Number(data.get('restaurant_id')),amount_paise:Math.round(Number(data.get('amount'))*100)}));await refreshAccount()},'Simulation recorded. Verified spending remains unchanged.')}}><h3>Test a transaction</h3><label>Restaurant<select name="restaurant_id" required>{results.map(r=><option key={r.restaurant.id} value={r.restaurant.id}>{r.restaurant.name}</option>)}</select></label><label>Amount (₹)<input name="amount" type="number" min="1" step="0.01" defaultValue={300} required/></label><button className="secondary" disabled={!user.consent||busy||!results.length||!simulation}>Simulate transaction</button></form>
  {transactions.map(t=><div className="history-row" key={t.id}><span>{money(t.amount_paise)}</span><small>{t.simulated?'SIMULATED · not verified':t.disputed?'Disputed · excluded from spending':t.refunded_paise>=t.amount_paise?'Refunded · excluded from spending':t.refunded_paise?'Partially refunded':'Verified'}</small></div>)}</section></div>
  <section className="panel"><h2>Offer reservation history</h2>{redemptions.length?redemptions.map(r=><div className="history-row" key={r.id}><span>Reservation #{r.id}</span><span>{money(r.discount_paise)} discount · {new Date(r.created_at).toLocaleDateString()}</span></div>):<p className="subtle">Your reserved offers will appear here.</p>}</section>
