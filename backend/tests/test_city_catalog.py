@@ -56,7 +56,8 @@ def test_import_sql_repeats_without_changing_metadata_or_menus(client):
     from app.database import Session,Restaurant,MenuItem,engine
     if engine.dialect.name!='postgresql':pytest.skip('PostgreSQL fixture required for JSONB import')
     build=runpy.run_path(str(Path(__file__).resolve().parents[2]/'scripts/catalog/build_import_sql.py'))['batch_sql']
-    row=normalize(fixture(),'test','2026-11-12T00:00:00+00:00')
+    raw=fixture();raw['names']['primary']="Fixture 100% Café's"
+    row=normalize(raw,'test','2026-11-12T00:00:00+00:00')
     with Session() as db:
         r=Restaurant(name='Preserved owner name',address='Owner address',area='Borivali',latitude=row['latitude'],longitude=row['longitude'],cuisine='Indian',source_id='osm:node:fixture',sample=False)
         db.add(r);db.flush()
@@ -66,7 +67,7 @@ def test_import_sql_repeats_without_changing_metadata_or_menus(client):
     new=copy.deepcopy(row);new['external_id']='00000000-0000-0000-0000-000000000002';new['source_id']='overture:'+new['external_id'];new['target_source_id']=new['source_id']
     for _ in range(2):
         with engine.connect().execution_options(isolation_level='AUTOCOMMIT') as db:
-            db.exec_driver_sql(build([row,new]))
+            db.connection.driver_connection.execute(build([row,new]))
     with Session() as db:
         assert db.get(Restaurant,rid).name=='Preserved owner name'
         assert db.get(MenuItem,mid).price_paise==10000

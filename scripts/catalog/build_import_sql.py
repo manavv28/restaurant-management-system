@@ -11,19 +11,25 @@ def batch_sql(records):
     tag='$biteai_city_extract$'
     if tag in payload:raise ValueError('SQL delimiter collision')
     source=f"jsonb_to_recordset({tag}{payload}{tag}::jsonb) AS x(name text,address text,area text,latitude double precision,longitude double precision,phone text,website text,pin_code text,cuisine text,source_id text,source text,external_id text,licence text,observed_at text,details text,target_source_id text)"
-    return f"""BEGIN;
+    return f"""WITH input AS (SELECT * FROM {source}),
+inserted AS (
 INSERT INTO restaurants (name,address,area,latitude,longitude,phone,website,pin_code,cuisine,source_id,source,sample,updated_at,opening_hours,price_range,image_url,image_attribution,ordering_url,ownership_verified)
 SELECT name,address,area,latitude,longitude,phone,website,pin_code,cuisine,source_id,source,false,observed_at,'Unknown','Unknown','','','',false
-FROM {source} WHERE source_id=target_source_id
-ON CONFLICT (source_id) DO NOTHING;
+FROM input WHERE source_id=target_source_id
+ON CONFLICT (source_id) DO NOTHING RETURNING id,source_id
+), aliases AS (
 INSERT INTO catalog_identities (provider,external_id,restaurant_id,source_url,licence,observed_at,details)
-SELECT 'overture',x.external_id,r.id,'https://explore.overturemaps.org/?gers_id='||x.external_id,x.licence,x.observed_at,x.details
-FROM {source} JOIN restaurants r ON r.source_id=x.target_source_id
+SELECT 'overture',x.external_id,coalesce(i.id,r.id),'https://explore.overturemaps.org/?gers_id='||x.external_id,x.licence,x.observed_at,x.details
+FROM input x LEFT JOIN inserted i ON i.source_id=x.target_source_id
+LEFT JOIN restaurants r ON r.source_id=x.target_source_id
+WHERE coalesce(i.id,r.id) IS NOT NULL
 ON CONFLICT (provider,external_id) DO UPDATE SET licence=EXCLUDED.licence,observed_at=EXCLUDED.observed_at,details=EXCLUDED.details
-WHERE catalog_identities.restaurant_id=EXCLUDED.restaurant_id;
-COMMIT;
-SELECT count(*) AS real_listings FROM restaurants WHERE sample=false;
+WHERE catalog_identities.restaurant_id=EXCLUDED.restaurant_id
+RETURNING restaurant_id
+)
+SELECT (SELECT count(*) FROM inserted) AS inserted_listings,count(*) AS linked_provider_records FROM aliases;
 """
+
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(description=__doc__);p.add_argument('plan');p.add_argument('output');p.add_argument('--batch-size',type=int,default=250)
