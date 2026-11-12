@@ -2,6 +2,8 @@ import {test,expect} from '@playwright/test';
 
 test('citywide directory loads lazily, filters and paginates',async({page})=>{
  const requests:string[]=[];
+ await page.route('**/api/restaurants/501',route=>route.fulfill({json:{restaurant:{id:501,name:'First fixture café',area:'Borivali',address:'Synthetic browser fixture',cuisine:'Unspecified',source:'Synthetic fixture',phone:'',website:'',sample:false,opening_hours:'Unknown',updated_at:'2026-11-12T00:00:00Z'},menu:[]}}));
+ await page.route('**/api/restaurants/501/click',route=>route.fulfill({json:{saved:true}}));
  await page.route('**/api/catalog/restaurants?**',async route=>{
   const url=new URL(route.request().url());requests.push(url.search);
   const later=url.searchParams.get('after')==='501';
@@ -13,6 +15,11 @@ test('citywide directory loads lazily, filters and paginates',async({page})=>{
  await page.getByRole('button',{name:'Browse Mumbai restaurant directory'}).click();
  const directory=page.getByRole('region',{name:'Mumbai restaurant directory'});
  await expect(directory.getByRole('button',{name:'First fixture café'})).toBeVisible();
+ const clickRequest=page.waitForRequest(request=>request.url().endsWith('/restaurants/501/click')&&request.method()==='POST');
+ await directory.getByRole('button',{name:'First fixture café'}).click();
+ expect((await clickRequest).postDataJSON()).not.toHaveProperty('attribution');
+ await expect(page.getByRole('dialog')).toContainText('First fixture café');
+ await page.getByRole('button',{name:'Close',exact:true}).click();
  await directory.getByRole('button',{name:'Next page'}).click();
  await expect(directory.getByRole('button',{name:'Second fixture café'})).toBeVisible();
  await expect(directory.getByRole('button',{name:'Next page'})).toBeDisabled();
