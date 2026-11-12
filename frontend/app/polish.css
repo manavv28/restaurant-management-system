@@ -1,0 +1,190 @@
+/* Shared interaction styles. Keep specialised map and card controls independent. */
+:root {
+  --orange: #cf4829;
+  --ink: #213d34;
+  --muted: #68766d;
+  --line: #e3e7df;
+  --green: #244c3c;
+  --cream: #fbfaf7;
+}
+body { -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+button, a, input, select, summary { touch-action: manipulation; }
+button, a { transition: background-color .18s ease, color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+button:disabled { opacity: .55; }
+button:not(:disabled):active { transform: translateY(1px); }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible {
+  outline: 3px solid #b44125; outline-offset: 4px;
+}
+:where(.panel, .workspace, .modal, .trace-panel, .catalog-panel, .empty) :where(button):not([class]) {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  min-height: 42px; padding: 10px 16px; border: 1px solid #dce3d8;
+  border-radius: 12px; background: #f4f6f0; color: #284a3b; font-size: 12px;
+  line-height: 1.45; font-weight: 600; text-align: center;
+}
+:where(.panel, .workspace, .modal, .trace-panel, .catalog-panel, .empty) :where(button):not([class]):hover:not(:disabled) {
+  background: #e9efe4; border-color: #bfceba;
+}
+.primary, .secondary, .sign-in {
+  min-height: 44px; border-radius: 13px; padding: 12px 19px; line-height: 1.4;
+  font-size: 13px; font-weight: 600; letter-spacing: .05px;
+}
+.primary {
+  background: linear-gradient(135deg, #de5732, #c74628); border: 1px solid #c74628;
+  box-shadow: 0 3px 0 #95371b15, 0 5px 12px #cf48291a;
+}
+.primary:hover:not(:disabled) { background: #bb3f24; box-shadow: 0 6px 18px #cf48292b; }
+.secondary, .sign-in { background: #fff; border: 1px solid #dbe2d6; box-shadow: 0 2px 3px #213d3404; }
+.secondary:hover:not(:disabled), .sign-in:hover { background: #f0f4eb; border-color: #aebfa7; }
+.text-button { min-height: 40px; padding: 9px 5px; color: #b93f24; font-weight: 600; }
+.text-button:hover { color: #8c301a; text-decoration: underline; text-underline-offset: 4px; }
+.header { background: #fffdf9; }
+.header nav button { font-size: 13px; color: #637269; min-height: 44px; }
+.header nav button:hover { color: #b44125; }
+.hero { background: radial-gradient(ellipse at 87% 40%, #e9ecd9 0, transparent 58%); }
+.hero p { font-size: 15px; color: #627468; }
+.search-section { border-radius: 22px; padding: 25px 27px 0; box-shadow: 0 16px 48px #213d340a; }
+.search-topline { color: #4d6559; font-size: 10px; }
+.search-box { border-radius: 15px; background: #fdfdfb; padding: 9px 10px 9px 18px; }
+.search-box:focus-within { border-color: #9aaf94; box-shadow: 0 0 0 3px #8fabc21a; }
+.search-box input { font-size: 16px; color: #213d34; }
+.mic { display: flex; align-items: center; justify-content: center; min-width: 44px; min-height: 44px; border-radius: 10px; border-right: 0; padding: 10px; }
+.mic:hover { background: #eaf0e4; }
+.search-filters { gap: 15px; min-height: 70px; }
+.search-filters label { color: #566b5e; font-size: 12px; }
+.search-filters select { padding: 9px 7px; border-radius: 9px; min-height: 40px; max-width: 155px; font-size: 12px; }
+.search-filters select:hover { background: #f0f4eb; }
+.location-btn { min-height: 40px; padding: 8px; border-radius: 10px; font-size: 11px; color: #456a50; }
+.location-btn:hover { background: #edf3e8; }
+.sample-toggle { font-size: 11px; }
+.sample-toggle input { width: 16px; height: 16px; }
+.panel { border-radius: 19px; box-shadow: 0 4px 16px #213d3403; padding: 26px; }
+.panel p { color: #627166; font-size: 13px; }
+.panel h2 { font-size: 21px; }
+.catalog-panel { background: linear-gradient(115deg, #f0f4e9, #f8f9f2); border-radius: 18px; padding: 24px; }
+.catalog-panel p, .catalog-panel small { color: #5c6d5d; }
+.catalog-numbers { gap: 16px 28px; }
+.catalog-numbers > span { display: flex; flex-direction: column; gap: 5px; font-size: 12px; color: #53694f; }
+.catalog-numbers b { font-size: 28px; letter-spacing: -.8px; color: #254b37; }
+.catalog-panel a, .source-note a, .card-detail a { color: #325d42; text-decoration: underline; text-underline-offset: 3px; }
+.section-toggle { width: 100%; display: flex; align-items: center; gap: 14px; text-align: left; min-height: 52px; padding: 0; font-size: 15px; font-weight: 650; }
+.section-toggle:hover { color: #b44125; }
+.section-toggle > span:nth-child(2) { flex: 1; min-width: 0; }
+.section-toggle small { display: block; font-size: 12px; color: #6d7b70; font-weight: 400; margin-top: 5px; line-height: 1.5; }
+.section-toggle-icon { display: flex; flex-shrink: 0; width: 46px; height: 46px; align-items: center; justify-content: center; border-radius: 14px; background: #eff3e9; color: #486e45; }
+.section-toggle > svg { flex-shrink: 0; transition: transform .2s; }
+.chevron-open { transform: rotate(180deg); }
+.delivery-content { border-top: 1px solid var(--line); padding-top: 24px; margin-top: 22px; }
+.delivery-content > h2 { margin-bottom: 10px; }
+.platform-browse { display: flex; gap: 10px; flex-wrap: wrap; margin: 18px 0 12px; }
+.platform-browse a { display: inline-flex; align-items: center; gap: 8px; padding: 11px 15px; border-radius: 11px; background: #f7f6f1; border: 1px solid #e3e6dc; font-weight: 600; color: #31503d; }
+.platform-browse a:hover { border-color: #b3c3a8; background: #edf2e6; }
+.provider-card { padding: 20px; margin: 16px 0; border: 1px solid #e4e8df; border-radius: 15px; background: #fdfdfb; }
+.provider-heading { display: flex; align-items: center; gap: 11px; margin-bottom: 14px; flex-wrap: wrap; }
+.provider-heading h3 { margin: 0; font-size: 17px; flex: 1; }
+.provider-mark { width: 36px; height: 36px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; font-size: 25px; font-weight: 800; font-style: italic; color: white; }
+.zomato-mark { background: #c9384b; }
+.swiggy-mark { background: #cf5a13; }
+.connection-badge { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; color: #486349; background: #edf3e8; padding: 6px 9px; border-radius: 20px; }
+.provider-connect { margin-top: 8px; }
+.connection-privacy { display: flex; gap: 8px; align-items: flex-start; font-size: 12px !important; margin: 20px 0 0; line-height: 1.65; }
+.connection-privacy svg { flex-shrink: 0; margin-top: 2px; }
+.platform-message { background: #f0f4e9; padding: 13px 16px; border-radius: 11px; display: flex; align-items: center; gap: 8px; overflow-wrap: anywhere; }
+.provider-card ul { padding: 0; list-style: none; }
+.provider-card li { padding: 14px 0; border-top: 1px solid var(--line); line-height: 1.8; font-size: 13px; }
+.provider-card li button { margin: 8px 0 0 8px; }
+.directory-search { display: grid !important; grid-template-columns: 1.4fr 1fr auto; align-items: end; margin-top: 20px; }
+.directory-panel > div > p { margin-top: 20px; }
+.directory-list { list-style: none; margin: 20px 0; padding: 0; }
+.directory-list li + li { border-top: 1px solid var(--line); }
+.directory-result { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 18px; text-align: left; padding: 18px 10px; border-radius: 10px; }
+.directory-result:hover { background: #f0f4eb; }
+.directory-result strong { font-size: 14px; font-weight: 600; }
+.directory-result small { display: block; margin-top: 6px; color: #657362; line-height: 1.6; overflow-wrap: anywhere; }
+.directory-result svg { flex-shrink: 0; }
+.categories button { border-radius: 14px; min-height: 46px; font-size: 12px; box-shadow: 0 2px 3px #213d3403; }
+.categories .selected { box-shadow: 0 4px 12px #244c3c20; }
+.restaurant-card { border-radius: 20px; box-shadow: 0 4px 15px #213d3405; }
+.card-body { padding: 22px 20px 0; }
+.restaurant-location { color: #637560; font-size: 12px; }
+.dish-row { background: #f1f5eb; border-radius: 12px; padding: 14px; }
+.dish-row small { color: #586b4f; }
+.dish-row p { font-size: 13px; }
+.card-detail { color: #667461; }
+.card-links { gap: 7px; }
+.card-links a { display: inline-flex; padding: 8px 11px; min-height: 36px; align-items: center; border-radius: 9px; background: #f3f5ed; color: #416340; font-weight: 600; }
+.card-links a:hover { background: #e7efdf; }
+.card-footer { border-top: 1px solid #edf0e8; margin-top: 18px; }
+.card-footer button { min-height: 40px; font-size: 12px; padding: 8px 12px; border-radius: 10px; background: #edf3e7; color: #335d35; }
+.card-footer button:hover { background: #dfead6; }
+.card-footer span { color: #4b6c3c; font-size: 10px; }
+.view-switch { border-radius: 12px; }
+.view-switch button { min-width: 42px; min-height: 42px; justify-content: center; border-radius: 9px; }
+.results-foot button { min-height: 42px; padding: 9px; border-radius: 10px; color: #5a705b; }
+.results-foot button:hover { background: #edf2e7; }
+.reward-banner { border-radius: 22px; }
+.reward-banner button { min-height: 44px; background: #254b3b; color: white; padding: 12px 18px; border-radius: 12px; }
+.reward-banner button:hover { background: #183b2b; }
+form label { font-size: 12px; }
+form input, form select, textarea { min-height: 44px; border-radius: 11px; border-color: #d9e0d3; padding: 12px 14px; }
+form input:hover, form select:hover { border-color: #a9baa1; }
+form input[type=checkbox] { min-height: auto; width: 17px; height: 17px; }
+.metric-grid > div, .offer, .portal-details, .trace-panel { border-radius: 16px; }
+.metric-grid small { color: #596b53; }
+.saved-list button { border-radius: 12px; min-height: 44px; }
+.portal-details summary { min-height: 36px; padding: 8px 4px; color: #3f5c45; }
+.modal { border-radius: 24px; }
+.close { min-width: 36px; min-height: 36px; align-items: center; justify-content: center; background: #edf0e6; }
+.close:hover { background: #dfe7d5; }
+.detail-actions a, .detail-actions button { min-height: 42px; font-size: 12px; }
+.source-note { color: #566a4c; overflow-wrap: anywhere; }
+.source-note button + button { margin-left: 8px; }
+.suggestion-row { padding: 16px 8px; border-radius: 10px; }
+.suggestion-row:hover { background: #f2f5ed; }
+.toast { border-radius: 15px; padding: 16px 18px; box-shadow: 0 10px 36px #213d3426; }
+@media (max-width: 760px) {
+  .header nav { gap: 20px; }
+  .header nav button { font-size: 11px; }
+  .hero p { font-size: 12px; }
+  .search-section { padding: 19px 16px 0; border-radius: 18px; }
+  .search-box { padding: 8px; }
+  .search-box input { font-size: 14px; }
+  .search-topline { font-size: 8px; }
+  .search-filters { gap: 4px 8px; padding: 10px 0; }
+  .search-filters label, .search-filters select { font-size: 11px; }
+  .search-filters select { max-width: 125px; }
+  .sample-toggle { font-size: 10px; }
+  .panel, .catalog-panel { padding: 19px; border-radius: 16px; }
+  .catalog-numbers { gap: 16px 20px; }
+  .catalog-numbers b { font-size: 25px; }
+  .catalog-numbers > span { font-size: 11px; max-width: 140px; }
+  .section-toggle { gap: 11px; font-size: 14px; }
+  .section-toggle small { font-size: 11px; }
+  .section-toggle-icon { width: 38px; height: 38px; border-radius: 11px; }
+  .provider-card { padding: 16px; }
+  .provider-connect { width: 100%; }
+  .directory-search { grid-template-columns: 1fr !important; }
+  .directory-search button { width: 100%; }
+  .restaurant-grid { grid-template-columns: 1fr; gap: 20px; }
+  .card-art { height: 190px; }
+  .card-title button { font-size: 19px; }
+  .card-body { padding: 19px 18px 0; }
+  .card-detail { font-size: 12px; }
+  .card-tag, .cuisine-tag { font-size: 9px; padding: 7px 9px; }
+  .save-btn { width: 38px; height: 38px; }
+  .restaurant-location { font-size: 12px; }
+  .dish-row p { font-size: 14px; }
+  .dish-row strong { font-size: 18px; }
+  .card-footer { flex-wrap: wrap; }
+  .card-footer button { font-size: 12px; }
+  .reward-banner button { margin-left: 0; width: 100%; justify-content: center; }
+  .modal-backdrop { padding: 12px; }
+  .modal { padding: 30px 21px; border-radius: 20px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  button, a, .section-toggle > svg { transition: none; }
+}
+.provider-card, .directory-panel, .delivery-content { overflow-wrap: anywhere; }
+@media (max-width: 360px) {
+  .provider-heading { gap: 8px; }
+  .connection-badge { font-size: 10px; padding: 5px 7px; }
+}

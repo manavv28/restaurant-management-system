@@ -47,3 +47,18 @@ test('Zomato linking stays separate from unverified live menu availability',asyn
  await expect(connection.getByRole('button',{name:'Connect Zomato'})).toBeVisible();
  expect(new URL(page.url()).searchParams.has('zomato')).toBe(false);
 });
+
+test('mobile provider controls are keyboard accessible and remain usable during connection',async({page})=>{
+ await page.setViewportSize({width:360,height:800});
+ await page.route(/\/api\/me(?:\/|\?|$)/,route=>route.fulfill({json:new URL(route.request().url()).pathname==='/api/me'?{id:991,name:'Synthetic user',email:'synthetic@example.test',role:'customer',consent:false,email_verified:true,query_count:0,verified_spend_paise:0}:[]}));
+ await page.route('**/api/platforms/status',route=>route.fulfill({json:{swiggy:{available:true,connected:false},zomato:{available:false,can_connect:true,connected:false,mode:'schema_verification_pending'}}}));
+ let release:()=>void=()=>{};const gate=new Promise<void>(resolve=>{release=resolve});let connections=0;
+ await page.route('**/api/platforms/swiggy/connect',async route=>{connections++;await gate;await route.fulfill({status:503,json:{detail:'Synthetic provider connection unavailable. Please retry.'}})});
+ await page.goto('/');
+ const toggle=page.getByRole('button',{name:'Check Zomato and Swiggy',exact:true});await toggle.focus();await page.keyboard.press('Enter');await expect(toggle).toHaveAttribute('aria-expanded','true');
+ const connect=page.getByRole('button',{name:'Connect Swiggy',exact:true});await expect(connect).toBeVisible();await expect.poll(async()=>(await connect.boundingBox())?.height??0).toBeGreaterThanOrEqual(44);
+ await connect.click();await expect(connect).toBeDisabled();await expect(page.getByRole('button',{name:'Connect Zomato',exact:true})).toBeDisabled();await expect.poll(()=>connections).toBe(1);release();
+ await expect(page.getByRole('status').filter({hasText:'Synthetic provider connection unavailable'})).toBeVisible();await expect(connect).toBeEnabled();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ await toggle.focus();await page.keyboard.press('Enter');await expect(toggle).toHaveAttribute('aria-expanded','false');
+});
