@@ -51,7 +51,7 @@ async def run_one():
                 html=await fetch_menu(source);observed_url=source.url
                 trace.append({'agent':'Collection','tool':'approved_https_and_robots','bytes':len(html.encode())})
                 items,text=structured_menu(html)
-                method='schema.org'
+                method=items[0].get('method','schema.org') if items else 'no structured prices'
                 if not items:
                     from .discovery import menu_candidates
                     from types import SimpleNamespace
@@ -60,6 +60,7 @@ async def run_one():
                         candidate_items,candidate_text=structured_menu(candidate_html)
                         if candidate_items:
                             html=candidate_html;items=candidate_items;text=candidate_text;observed_url=candidate
+                            method=items[0].get('method','schema.org')
                             trace.append({'agent':'Source discovery','tool':'approved_menu_link','url':candidate})
                             break
                 if not items:

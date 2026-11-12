@@ -1,0 +1,169 @@
+{
+  "area": "Bandra",
+  "restaurants_checked": 10,
+  "with_explicit_prices": 1,
+  "publishable_items": 91,
+  "results": [
+    {
+      "restaurant_id": 24,
+      "name": "Hakkasan",
+      "area": "Bandra",
+      "menu_url": "https://taogroup.com/venues/hakkasan-mumbai/menu/",
+      "identity_reviewed": true,
+      "note": "Official Mumbai menu; Bandra Waterfield Road identity matched. Dine-in section only.",
+      "checked_at": "2026-11-12T08:57:44.181347+00:00",
+      "status": "explicit_publisher_prices",
+      "format": "html",
+      "content_hash": "02da2d484259c83495f44b0335618c40cdcceb6f097f31654a9bcddcddb5c935",
+      "ocr": false,
+      "publishable_items": 91,
+      "review_candidates": [],
+      "text_characters": 38782,
+      "partial_document": false,
+      "example_prices": [
+        {
+          "name": "Edamame truffle dumpling",
+          "price_paise": 145000
+        },
+        {
+          "name": "Edamame and asparagus dumpling",
+          "price_paise": 99500
+        },
+        {
+          "name": "Spicy jackfruit dumpling",
+          "price_paise": 59500
+        }
+      ]
+    },
+    {
+      "restaurant_id": 35,
+      "name": "Meraki",
+      "area": "Bandra",
+      "menu_url": "",
+      "identity_reviewed": false,
+      "note": "Official website returns 404. No current independently published menu confirmed.",
+      "checked_at": "2026-11-12T08:57:45.577058+00:00",
+      "status": "identity_or_source_review_required",
+      "publishable_items": 0
+    },
+    {
+      "restaurant_id": 97,
+      "name": "GOH JIA TING",
+      "area": "Bandra",
+      "menu_url": "",
+      "identity_reviewed": false,
+      "note": "Existing OSM website points to Bora Bora, a different brand. Do not attach its menu.",
+      "checked_at": "2026-11-12T08:57:45.577076+00:00",
+      "status": "identity_or_source_review_required",
+      "publishable_items": 0
+    },
+    {
+      "restaurant_id": 186,
+      "name": "Ray's Cafe & Pizzeria",
+      "area": "Bandra",
+      "menu_url": "https://img1.wsimg.com/blobby/go/76b67079-49b1-4799-baf8-baa685c8c1e4/Ray's%20Menu%20rev%20Feb25.pdf",
+      "identity_reviewed": true,
+      "note": "PDF linked from official menu page; February 2025 filename. Review date, portions and prices before publication.",
+      "checked_at": "2026-11-12T08:57:45.577080+00:00",
+      "status": "document_review_required",
+      "format": "pdf",
+      "content_hash": "f5ee04d3a6f096e5a74843d2766e1098133ab7f11b8b8e452c938a8fda4a6ef9",
+      "ocr": true,
+      "publishable_items": 0,
+      "review_candidates": [],
+      "text_characters": 689,
+      "partial_document": true
+    },
+    {
+      "restaurant_id": 264,
+      "name": "Elco Restaurant",
+      "area": "Bandra",
+      "menu_url": "https://www.elcorestaurants.com/menu.html",
+      "identity_reviewed": true,
+      "note": "Official Hill Road menu has dish names without prices. No prices inferred.",
+      "checked_at": "2026-11-12T08:57:48.889455+00:00",
+      "status": "document_review_required",
+      "format": "html",
+      "content_hash": "58148d361498e76a92dacb3dee6b82e194ccba3caec312307efa983acf6b7ff8",
+      "ocr": false,
+      "publishable_items": 0,
+      "review_candidates": [],
+      "text_characters": 5129,
+      "partial_document": false
+    },
+    {
+      "restaurant_id": 265,
+      "name": "Jai Jawan",
+      "area": "Bandra",
+      "menu_url": "https://jaijawanfoods.com/menu/",
+      "identity_reviewed": true,
+      "note": "Bandra menu link is a coming-soon image; Khar and Andheri PDFs are different branches.",
+      "checked_at": "2026-11-12T08:57:49.454925+00:00",
+      "status": "document_review_required",
+      "format": "html",
+      "content_hash": "6bfc0fb72f9569c45ccee4ec15e6a586f82e5db3cddaa20abd456411eea35245",
+      "ocr": false,
+      "publishable_items": 0,
+      "review_candidates": [],
+      "text_characters": 635,
+      "partial_document": false
+    },
+    {
+      "restaurant_id": 270,
+      "name": "Sahibaan",
+      "area": "Bandra",
+      "menu_url": "https://www.sahibaan.com/",
+      "identity_reviewed": true,
+      "note": "Official site checked; menu/prices not established.",
+      "checked_at": "2026-11-12T08:57:51.075075+00:00",
+      "status": "document_review_required",
+      "format": "html",
+      "content_hash": "aa4d6468b1354c7634fb89854415601378e2cc52d2b4aa5e1de49df3db784a8a",
+      "ocr": false,
+      "publishable_items": 0,
+      "review_candidates": [],
+      "text_characters": 8,
+      "partial_document": false
+    },
+    {
+      "restaurant_id": 273,
+      "name": "Yugo Sushi",
+      "area": "Bandra",
+      "menu_url": "",
+      "identity_reviewed": false,
+      "note": "Listed website unavailable. Search matches include unrelated foreign branches; no import.",
+      "checked_at": "2026-11-12T08:57:52.052085+00:00",
+      "status": "identity_or_source_review_required",
+      "publishable_items": 0
+    },
+    {
+      "restaurant_id": 325,
+      "name": "Gracias Granny",
+      "area": "Bandra",
+      "menu_url": "https://graciasgranny.com/",
+      "identity_reviewed": true,
+      "note": "Independent brand page checked. Branch-specific price evidence not established.",
+      "checked_at": "2026-11-12T08:57:52.052108+00:00",
+      "status": "document_review_required",
+      "format": "html",
+      "content_hash": "70e95df24cc4544c90e2c0a67a2dda1fe9caec01ba25c66ef71cf77ceb8ced44",
+      "ocr": false,
+      "publishable_items": 0,
+      "review_candidates": [],
+      "text_characters": 3599,
+      "partial_document": false
+    },
+    {
+      "restaurant_id": 3,
+      "name": "Banana Leaf",
+      "area": "Bandra",
+      "menu_url": "",
+      "identity_reviewed": false,
+      "note": "OSM area bucket includes a Juhu address. Official chain menu cannot establish this branch identity.",
+      "checked_at": "2026-11-12T08:57:55.841833+00:00",
+      "status": "identity_or_source_review_required",
+      "publishable_items": 0
+    }
+  ],
+  "notice": "Publisher observations, not guaranteed live restaurant prices. OCR/PDF candidates are never automatically published. Google Maps photos are not harvested."
+}

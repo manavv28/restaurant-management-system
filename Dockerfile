@@ -22,7 +22,7 @@ ARG DATABASE_CA_SOURCE=official
 RUN --mount=type=bind,source=.,target=/src,readonly \
     --mount=type=secret,id=system_ca --mount=type=secret,id=supabase_ca \
     set -eu; \
-    apt-get update; apt-get install -y --no-install-recommends libstdc++6 ca-certificates openssl; \
+    apt-get update; apt-get install -y --no-install-recommends libstdc++6 ca-certificates openssl poppler-utils tesseract-ocr tesseract-ocr-eng util-linux; \
     rm -rf /var/lib/apt/lists/*; \
     if [ -f /run/secrets/system_ca ]; then export PIP_CERT=/run/secrets/system_ca SSL_CERT_FILE=/run/secrets/system_ca; fi; \
     pip install --no-cache-dir -r /src/backend/requirements.txt; \
