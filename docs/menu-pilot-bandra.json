@@ -1,0 +1,82 @@
+[
+  {
+    "restaurant_id": 24,
+    "name": "Hakkasan",
+    "area": "Bandra",
+    "menu_url": "https://taogroup.com/venues/hakkasan-mumbai/menu/",
+    "identity_reviewed": true,
+    "note": "Official Mumbai menu; Bandra Waterfield Road identity matched. Dine-in section only."
+  },
+  {
+    "restaurant_id": 35,
+    "name": "Meraki",
+    "area": "Bandra",
+    "menu_url": "",
+    "identity_reviewed": false,
+    "note": "Official website returns 404. No current independently published menu confirmed."
+  },
+  {
+    "restaurant_id": 97,
+    "name": "GOH JIA TING",
+    "area": "Bandra",
+    "menu_url": "",
+    "identity_reviewed": false,
+    "note": "Existing OSM website points to Bora Bora, a different brand. Do not attach its menu."
+  },
+  {
+    "restaurant_id": 186,
+    "name": "Ray's Cafe & Pizzeria",
+    "area": "Bandra",
+    "menu_url": "https://img1.wsimg.com/blobby/go/76b67079-49b1-4799-baf8-baa685c8c1e4/Ray's%20Menu%20rev%20Feb25.pdf",
+    "identity_reviewed": true,
+    "note": "PDF linked from official menu page; February 2025 filename. Review date, portions and prices before publication."
+  },
+  {
+    "restaurant_id": 264,
+    "name": "Elco Restaurant",
+    "area": "Bandra",
+    "menu_url": "https://www.elcorestaurants.com/menu.html",
+    "identity_reviewed": true,
+    "note": "Official Hill Road menu has dish names without prices. No prices inferred."
+  },
+  {
+    "restaurant_id": 265,
+    "name": "Jai Jawan",
+    "area": "Bandra",
+    "menu_url": "https://jaijawanfoods.com/menu/",
+    "identity_reviewed": true,
+    "note": "Bandra menu link is a coming-soon image; Khar and Andheri PDFs are different branches."
+  },
+  {
+    "restaurant_id": 270,
+    "name": "Sahibaan",
+    "area": "Bandra",
+    "menu_url": "https://www.sahibaan.com/",
+    "identity_reviewed": true,
+    "note": "Official site checked; menu/prices not established."
+  },
+  {
+    "restaurant_id": 273,
+    "name": "Yugo Sushi",
+    "area": "Bandra",
+    "menu_url": "",
+    "identity_reviewed": false,
+    "note": "Listed website unavailable. Search matches include unrelated foreign branches; no import."
+  },
+  {
+    "restaurant_id": 325,
+    "name": "Gracias Granny",
+    "area": "Bandra",
+    "menu_url": "https://graciasgranny.com/",
+    "identity_reviewed": true,
+    "note": "Independent brand page checked. Branch-specific price evidence not established."
+  },
+  {
+    "restaurant_id": 3,
+    "name": "Banana Leaf",
+    "area": "Bandra",
+    "menu_url": "",
+    "identity_reviewed": false,
+    "note": "OSM area bucket includes a Juhu address. Official chain menu cannot establish this branch identity."
+  }
+]

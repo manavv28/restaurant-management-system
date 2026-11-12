@@ -38,7 +38,7 @@ async def run_one():
             if claimed.rowcount:job=db.get(CatalogJob,candidate.id);break
         if not job:return None
         source=db.get(CatalogSource,job.source_id)
-        trace=[]
+        trace=[];job_id=job.id
         try:
             if not source or not source.enabled:raise ValueError('Source disabled')
             if source.kind=='osm':
@@ -51,7 +51,7 @@ async def run_one():
                 html=await fetch_menu(source);observed_url=source.url
                 trace.append({'agent':'Collection','tool':'approved_https_and_robots','bytes':len(html.encode())})
                 items,text=structured_menu(html)
-                method='schema.org'
+                method=items[0].get('method','schema.org') if items else 'no structured prices'
                 if not items:
                     from .discovery import menu_candidates
                     from types import SimpleNamespace
@@ -60,6 +60,7 @@ async def run_one():
                         candidate_items,candidate_text=structured_menu(candidate_html)
                         if candidate_items:
                             html=candidate_html;items=candidate_items;text=candidate_text;observed_url=candidate
+                            method=items[0].get('method','schema.org')
                             trace.append({'agent':'Source discovery','tool':'approved_menu_link','url':candidate})
                             break
                 if not items:
@@ -75,7 +76,7 @@ async def run_one():
             job.trace=json.dumps(trace);db.commit()
             return {'job_id':job.id,'state':job.state,'trace':trace}
         except Exception as exc:
-            jid=job.id
+            jid=job_id
             db.rollback()
             job=db.get(CatalogJob,jid)
             if isinstance(exc,httpx.HTTPStatusError):error=f'Provider returned HTTP {exc.response.status_code}'

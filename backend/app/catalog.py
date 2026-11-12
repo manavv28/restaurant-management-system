@@ -23,7 +23,7 @@ def future(hours):
 
 def approved_url(url):
     parsed=urlsplit(url)
-    hosts={h.strip().lower() for h in os.getenv('APPROVED_MENU_HOSTS','').split(',') if h.strip()}
+    hosts={h.strip().lower() for h in (os.getenv('APPROVED_MENU_HOSTS','')+','+os.getenv('PUBLISHER_MENU_HOSTS','')).split(',') if h.strip()}
     if parsed.scheme!='https' or not parsed.hostname or parsed.hostname.lower() not in hosts:
         raise ValueError('Menu host must be explicitly listed in APPROVED_MENU_HOSTS')
     if parsed.username or parsed.password or parsed.port not in (None,443):
@@ -104,7 +104,11 @@ def structured_menu(html):
     # Conflicting prices require review rather than selecting a guessed price.
     grouped={}
     for item in items:grouped.setdefault(item['name'].casefold(),[]).append(item)
-    return [rows[0] for rows in grouped.values() if len({r['price_paise'] for r in rows})==1], '\n'.join(page.text)
+    extracted=[rows[0] for rows in grouped.values() if len({r['price_paise'] for r in rows})==1]
+    if not items:
+        from .menu_documents import publisher_html_menu
+        extracted=publisher_html_menu(html)
+    return extracted, '\n'.join(page.text)
 
 async def ai_menu(text):
     """Gemini proposes evidence spans; code verifies name and numeric price in that span."""
@@ -144,7 +148,7 @@ async def fetch_menu(source):
             else:raise
         rules=RobotFileParser();rules.parse(robots.splitlines())
         if not rules.can_fetch(USER_AGENT,source.url):raise ValueError('Source robots.txt disallows collection')
-        return await bounded_get(client,source.url)
+        return await bounded_get(client,source.url,2_000_000)
 
 def import_osm(db,payload,area):
     if not isinstance(payload.get('elements'),list):raise ValueError('Malformed OSM response')
