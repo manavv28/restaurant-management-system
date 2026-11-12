@@ -1,0 +1,80 @@
+{
+  "verified_at": "2026-11-13T03:03:19.824403+05:30",
+  "release": "3678a24e8044dd40e5bb6731591d166e864a4b38",
+  "counts": {
+    "real_restaurants": 10404,
+    "with_phone": 8747,
+    "missing_phone": 1657,
+    "menu_prices": 357694,
+    "contact_evidence": 47,
+    "connected_provider_accounts": 0
+  },
+  "publication": {
+    "contacts_added": 47,
+    "evidence_rows": 47
+  },
+  "security": [
+    {
+      "name": "rls_enabled_no_policy",
+      "level": "INFO",
+      "count": 25
+    }
+  ],
+  "render_deploy": "dep-dbr2qjqfngtc73a155eg",
+  "vercel_deploy": "dpl_2LnMcP3hGKHd3KqjF9mp6ctZeE1L",
+  "render_plan": "free",
+  "supabase_project": "dtzjhhqjuaucrfwtrepv",
+  "integration_run": 43309011590,
+  "live_browser_run": 43309011561,
+  "backend_passed": 99,
+  "backend_pdf_skip": 1,
+  "browser_passed": 28,
+  "contact_review": {
+    "targets": 226,
+    "snapshots": 226,
+    "accepted_contacts": 47,
+    "rejections": {
+      "Original menu names a different area; review required": 49,
+      "Conflicting contact numbers; review required": 104,
+      "Original menu names a different brand; review required": 12,
+      "No unambiguous public business phone": 14
+    },
+    "plan_sha256": "3c675b22dcc3e014f6988799225ee85784815511891b6b751b5893a0f892004e"
+  },
+  "contact_rehearsal": {
+    "contacts_added": 47,
+    "menu_rows_preserved": 357604,
+    "replay_added_zero": true,
+    "matches_reviewed_plan": true
+  },
+  "public_browser": {
+    "status": "passed",
+    "release": "3678a24e8044",
+    "platformsVisible": true,
+    "swiggyReadyToConnect": true,
+    "zomatoReadyToConnect": true,
+    "liveProviderDataNotClaimed": true,
+    "contactId": 27,
+    "contactSourceVisible": true,
+    "phoneLinkCorrect": true,
+    "mobileOverflow": false,
+    "pageErrors": [],
+    "interceptedFailures": []
+  },
+  "provider_observations": {
+    "official_metadata": "Both OAuth metadata endpoints returned HTTP 200; unauthenticated initialize returned HTTP 401",
+    "swiggy_registration_status": 201,
+    "zomato_registration_status": 200,
+    "approval_basis": "User reported approvals; client registration alone is not provider certification",
+    "authenticated_provider_reads_verified": false,
+    "zomato_business_mapping": "Pending authenticated tool contract after a real account connection",
+    "swiggy_price_unit": "unknown; budget matches fail closed until provider units are confirmed"
+  },
+  "limitations": [
+    "Mumbai inventory, menus and contact coverage remain partial.",
+    "Actual end-user OAuth and provider menu reads require the user to connect their accounts.",
+    "MCP account data is not a bulk-catalogue export or public-data-lake licence.",
+    "Gemini key is absent in last verified health; deterministic parsing remains active.",
+    "Real microphone transcription, merchant/gateway certification, production backup/restore and incident-email delivery remain unverified."
+  ]
+}

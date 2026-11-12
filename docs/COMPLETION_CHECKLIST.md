@@ -21,7 +21,7 @@ Updated 13 November 2026 (India). Render Free + Supabase PostgreSQL remain the h
 - [x] Campaign reservation/discount/order-value reporting; reservations are never reported as sales.
 - [x] Signed refund/dispute events adjust eligibility; refund replay and delayed dispute events are tested. Browser callbacks cannot credit spending.
 - [x] PostGIS enabled in the unexposed extensions schema, geography GiST index, and indexed proximity prefilter with deterministic final distance checks. Portable SQL bounding-box fallback remains available.
-- [x] Additive migrations applied to live Supabase. Hosted columns, constraints, indexes and browser-role access matched the isolated tested schema. Nine SQL checksums were recorded after verification; future releases use the checksum runner. Do not blindly replay baseline SQL or use CLI db push against this manually initialized project.
+- [x] Additive migrations applied to live Supabase. Hosted columns, constraints, indexes and browser-role access matched the isolated tested schema. Ten SQL checksums were recorded after verification; future releases use the checksum runner. Do not blindly replay baseline SQL or use CLI db push against this manually initialized project.
 - [x] Retention worker runs every six hours while Render is awake; structured request IDs and sanitized server-error logs support diagnosis. No always-on worker is promised.
 - [x] Isolated pg_dump/pg_restore rehearsal: 378 records, matching complete-row hash.
 - [x] Legacy Render database inspected read-only: zero users/favourites/transactions; six sample restaurants and sample campaigns. Nothing was deleted or automatically transferred.
@@ -113,3 +113,7 @@ Release `086e67bbd4718aa377fd0e7d527821aa630b8031` is live on both selected orig
 ## Public menu price release, 13 November 2026 (India)
 
 Release `abae206e042a` is deployed on the selected Vercel frontend and Render Free backend. Supabase migration nine is applied with its checksum; RLS remains enabled. [Hosted integration](https://github.com/manavv28/restaurant-management-system/actions/runs/43286798643) and [public browser verification](https://github.com/manavv28/restaurant-management-system/actions/runs/43286798536) passed. A real supervised API refresh succeeded (job 76, source 484) on its first attempt. Bounded SQL ranking, idempotent batches, source attribution and original publisher preservation were tested against more than 300,000 prices. The final collection and publication totals are recorded in [the price report](catalog/menu-prices-2026-11-13.json).
+
+## Official platforms and contacts, 13 November 2026 (India)
+
+Release `3678a24e8044` adds official provider account links, protected credential tables, read-only Swiggy tools and Zomato authenticated-contract capture. Actual provider login and live reads still require user account consent. Both provider registrations accepted callback requests; this is not a claim of working authenticated price comparison. Hosted CI passed 99 backend tests plus one PDF skip and all 28 browser checks. Forty-seven public contacts were published with per-number evidence; 8,747 listings now have phone numbers. See [USER_BRIEF_CHECKLIST.md](USER_BRIEF_CHECKLIST.md) for the checklist against the exact original MVP brief and [the rollout evidence](catalog/provider-contacts-2026-11-13.json).
