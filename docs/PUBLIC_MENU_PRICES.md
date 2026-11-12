@@ -1,6 +1,6 @@
 # Public menu price collection
 
-IndiaRestros explicitly permits personal and commercial API use in its [terms](https://indiarestros.com/terms). Its [documented API](https://indiarestros.com/api/docs) publishes INR menu facts and a 120-request/minute/IP limit. The offline collector makes serial requests at 90/minute by default, capped at 100, and honors Retry-After. No account, API key, paid service, photographs, reviews or publisher descriptions are needed.
+IndiaRestros explicitly permits personal and commercial API use in its [terms](https://indiarestros.com/terms). Its [documented API](https://indiarestros.com/api/docs) publishes INR menu facts and a 120-request/minute/IP limit. The offline collector uses bounded page prefetch with a shared request rate of 90/minute by default, capped at 100, and honors Retry-After across requests. No account, API key, paid service, photographs, reviews or publisher descriptions are needed.
 
 Only venues inside the Mumbai City/Suburban boundary are considered. Matches require an exact normalized name within 80 metres, or matching phone and brand within 150 metres; ambiguous branches are rejected. The original menu URL is checked for conflicting brand/area names. One provider record is selected per existing venue, preferring the newest original observation. This cannot guarantee complete coverage or restaurant-confirmed prices.
 

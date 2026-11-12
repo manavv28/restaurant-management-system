@@ -1,8 +1,9 @@
-"""Documented keyless API consumer: serial requests, <=100/min, checkpointed facts only."""
+"""Documented keyless API consumer: bounded page prefetch, <=100/min, checkpointed facts only."""
 import argparse,json,time,hashlib,re,unicodedata,collections,email.utils
 from pathlib import Path
 from datetime import datetime,timezone
-import httpx
+import httpx,threading
+from concurrent.futures import ThreadPoolExecutor
 from shapely.geometry import shape,Point
 from shapely.ops import unary_union
 from app.city_catalog import normalized_name,metres
@@ -52,30 +53,61 @@ for file in (ROOT/'menus').glob('*.json'):
   menu=json.loads(file.read_text());counts['menus_downloaded']+=1
   counts['menu_items_received']+=sum(len(section['items']) for section in menu['menu']['sections'])
  except (ValueError,KeyError):file.unlink()
-last=0.;origin='https://indiarestros.com';headers={'User-Agent':'BiteAI-Catalog/0.2 (documented public API; attributed menu facts only)'}
+last=0.;blocked_until=0.;rate_lock=threading.Lock();origin='https://indiarestros.com';headers={'User-Agent':'BiteAI-Catalog/0.2 (documented public API; attributed menu facts only)'}
 with httpx.Client(timeout=30,headers=headers,follow_redirects=False) as client:
  def get(path,params=None):
-  global last
+  global last,blocked_until
   for attempt in range(3):
-   time.sleep(max(0,60/args.requests_per_minute-(time.monotonic()-last)));last=time.monotonic()
-   response=client.get(origin+path,params=params)
+   with rate_lock:
+    time.sleep(max(0,60/args.requests_per_minute-(time.monotonic()-last),blocked_until-time.monotonic()));last=time.monotonic()
+   try:response=client.get(origin+path,params=params)
+   except httpx.RequestError:
+    if attempt==2:raise
+    time.sleep(3);continue
    if response.status_code==429:
     retry=response.headers.get('Retry-After','60')
     try:delay=max(1,float(retry))
     except ValueError:
      try:delay=max(1,(email.utils.parsedate_to_datetime(retry)-datetime.now(timezone.utc)).total_seconds())
      except Exception:delay=60
-    print('Rate limited; pausing',delay,'seconds',flush=True);time.sleep(delay);continue
+    with rate_lock:blocked_until=max(blocked_until,time.monotonic()+delay)
+    print('Rate limited; pausing',delay,'seconds',flush=True);continue
    if response.status_code>=500 and attempt<2:time.sleep(3);continue
    response.raise_for_status()
    if len(response.content)>3_000_000 or 'json' not in response.headers.get('content-type',''):raise ValueError('Invalid or oversized API response')
    return response,response.json()
   raise RuntimeError('Provider rate limit persists; stopping collection')
+ def fetch_menu(hit,identity,file):
+  rid=hit['id']
+  try:
+   raw,menu=get('/api/v1/restaurants/'+rid+'/menu')
+   if menu.get('restaurant')!=rid or not isinstance(menu.get('sections'),list):raise ValueError('Menu identity or schema mismatch')
+   sections=[]
+   for section in menu['sections']:
+    sections.append({'name':section.get('name'),'items':[{k:item.get(k) for k in ('name','price','veg','dish','currency')} for item in section.get('items',[]) if isinstance(item,dict)]})
+   facts={k:menu.get(k) for k in ('restaurant','name','url','source','source_url','updated','currency')}
+   facts['sections']=sections
+   snapshot={'provider':'IndiaRestros','api_url':str(raw.request.url),'retrieved_at':datetime.now(timezone.utc).isoformat(),'content_hash':hashlib.sha256(raw.content).hexdigest(),
+    'identity':identity,'listing':{k:hit.get(k) for k in ('id','name','lat','lon','locality','cuisines','menu_items','url')},'menu':facts}
+   file.write_text(json.dumps(snapshot,ensure_ascii=False))
+   return {'menus_downloaded':1,'menu_items_received':sum(len(s['items']) for s in sections)}
+  except (httpx.HTTPStatusError,httpx.RequestError,ValueError) as exc:
+   with (ROOT/'errors.jsonl').open('a') as f:f.write(json.dumps({'id':rid,'error':type(exc).__name__,'status':getattr(getattr(exc,'response',None),'status_code',None)})+'\n')
+
+   return {'menu_fetch_errors':1}
+ # Bounded read-only page prefetch hides transport latency without raising the shared request rate.
+ pool=ThreadPoolExecutor(max_workers=8);pending={}
+ def page(offset):return get('/api/v1/restaurants',{'city':'mumbai','limit':50,'offset':offset})
+ def schedule(offset):
+  for candidate in range(offset,offset+400,50):
+   if candidate not in pending:pending[candidate]=pool.submit(page,candidate)
+ if not state.get('completed'):schedule(state['offset'])
  while not state.get('completed'):
-  offset=state['offset'];response,payload=get('/api/v1/restaurants',{'city':'mumbai','limit':50,'offset':offset})
+  offset=state['offset'];response,payload=pending.pop(offset).result()
   hits=payload.get('results');following=payload.get('next_offset')
   if not isinstance(hits,list) or len(hits)>50:raise ValueError('Unexpected restaurant page')
   if following is not None and (not isinstance(following,int) or following<=offset):raise ValueError('Pagination did not advance')
+  menu_tasks=[]
   for hit in hits:
    rid=hit.get('id','')
    if not re.fullmatch(r'IRR-[A-Z0-9]{10}',rid):raise ValueError('Invalid provider ID')
@@ -88,23 +120,12 @@ with httpx.Client(timeout=30,headers=headers,follow_redirects=False) as client:
    if not identity or not isinstance(hit.get('menu_items'),int) or hit['menu_items']<=0:continue
    file=ROOT/'menus'/(rid+'.json')
    if file.exists():continue
-   try:
-    raw,menu=get('/api/v1/restaurants/'+rid+'/menu')
-    if menu.get('restaurant')!=rid or not isinstance(menu.get('sections'),list):raise ValueError('Menu identity or schema mismatch')
-    sections=[]
-    for section in menu['sections']:
-     sections.append({'name':section.get('name'),'items':[{k:item.get(k) for k in ('name','price','veg','dish','currency')} for item in section.get('items',[]) if isinstance(item,dict)]})
-    facts={k:menu.get(k) for k in ('restaurant','name','url','source','source_url','updated','currency')}
-    facts['sections']=sections
-    snapshot={'provider':'IndiaRestros','api_url':str(raw.request.url),'retrieved_at':datetime.now(timezone.utc).isoformat(),'content_hash':hashlib.sha256(raw.content).hexdigest(),
-     'identity':identity,'listing':{k:hit.get(k) for k in ('id','name','lat','lon','locality','cuisines','menu_items','url')},'menu':facts}
-    file.write_text(json.dumps(snapshot,ensure_ascii=False));counts['menus_downloaded']+=1
-    counts['menu_items_received']+=sum(len(s['items']) for s in sections)
-   except (httpx.HTTPStatusError,httpx.RequestError,ValueError) as exc:
-    counts['menu_fetch_errors']+=1
-    with (ROOT/'errors.jsonl').open('a') as f:f.write(json.dumps({'id':rid,'error':type(exc).__name__,'status':getattr(getattr(exc,'response',None),'status_code',None)})+'\n')
+   menu_tasks.append(pool.submit(fetch_menu,hit,identity,file))
+  for task in menu_tasks:counts.update(task.result())
   state.update(offset=following if following is not None else offset,pages=state['pages']+1,counts=dict(counts),completed=following is None or not hits,checked_at=datetime.now(timezone.utc).isoformat())
   temporary=statepath.with_suffix('.tmp');temporary.write_text(json.dumps(state,indent=2));temporary.replace(statepath)
   if state['pages']%10==0 or state['completed']:print(json.dumps(state),flush=True)
+  if not state['completed']:schedule(state['offset'])
   if state['pages']>1200:raise RuntimeError('Review required: city pagination exceeded expected range')
+ pool.shutdown(wait=True,cancel_futures=True)
 print('Collection completed',json.dumps(state),flush=True)
