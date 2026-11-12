@@ -19,6 +19,23 @@ if is_sqlite:
         connection.execute('PRAGMA foreign_keys=ON')
 Session = sessionmaker(engine, expire_on_commit=False)
 class Base(DeclarativeBase): pass
+class ProviderConnection(Base):
+    __tablename__ = 'provider_connections'
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id',ondelete='CASCADE'),primary_key=True)
+    provider: Mapped[str] = mapped_column(String(30),primary_key=True)
+    encrypted_tokens: Mapped[str] = mapped_column(Text)
+    tool_manifest: Mapped[str] = mapped_column(Text,default='[]',server_default='[]')
+    retain_until: Mapped[str] = mapped_column(String(40))
+    expires_at: Mapped[str] = mapped_column(String(40))
+
+class ProviderOAuthState(Base):
+    __tablename__ = 'provider_oauth_states'
+    id: Mapped[str] = mapped_column(String(64),primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id',ondelete='CASCADE'),index=True)
+    session_id: Mapped[str] = mapped_column(String(64))
+    encrypted_flow: Mapped[str] = mapped_column(Text)
+    expires_at: Mapped[str] = mapped_column(String(40),index=True)
+
 class User(Base):
     __tablename__ = 'users'
     id: Mapped[int] = mapped_column(primary_key=True)

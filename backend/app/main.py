@@ -12,9 +12,23 @@ from .schemas import *
 from .agents import AREAS, understand, menu_search, discover_places, clean_places
 from .insights import router as insights_router,attribution,resolve_attribution
 from .ownership import router as ownership_router
+from .platforms import router as platforms_router
+from .zomato import router as zomato_router
 from .seed import seed
 from .account_security import router as security_router
 logging.basicConfig(level=logging.INFO)
+
+class PrivateRequestQueries(logging.Filter):
+    def filter(self,record):
+        # Uvicorn's access record has (address, method, path, version, status).
+        # OAuth authorization codes and state must not appear in app access logs.
+        if isinstance(record.args,tuple) and len(record.args)==5:
+            values=list(record.args)
+            if isinstance(values[2],str):values[2]=values[2].split('?',1)[0]
+            record.args=tuple(values)
+        return True
+
+logging.getLogger('uvicorn.access').addFilter(PrivateRequestQueries())
 
 @asynccontextmanager
 async def lifespan(app):
@@ -34,6 +48,8 @@ app = FastAPI(title='BiteAI API',version='0.1.0',lifespan=lifespan)
 app.include_router(security_router)
 app.include_router(insights_router)
 app.include_router(ownership_router)
+app.include_router(platforms_router)
+app.include_router(zomato_router)
 app.add_middleware(CORSMiddleware,allow_origins=os.getenv('CORS_ORIGINS','http://localhost:3000,http://127.0.0.1:3000').split(','),allow_methods=['GET','POST','PUT','DELETE'],allow_headers=['Authorization','Content-Type'])
 
 @app.middleware('http')
@@ -53,8 +69,9 @@ async def browser_security(request: Request, call_next):
         return JSONResponse({'detail':'Request failed. Please try again.','request_id':request_id},status_code=500)
     response.headers['X-Request-ID']=request_id
     if response.status_code>=500:logging.error('request_error request_id=%s status=%s elapsed_ms=%d',request_id,response.status_code,int((time.monotonic()-started)*1000))
-    if request.url.path.startswith(('/auth','/me','/portal','/payments')):
+    if request.url.path.startswith(('/auth','/me','/portal','/payments','/platforms')):
         response.headers['Cache-Control'] = 'no-store'
+    if request.url.path.startswith('/platforms'):response.headers['Referrer-Policy']='no-referrer'
     return response
 
 @app.post('/auth/logout')
@@ -197,12 +214,18 @@ def search_database(body,intent,parser,user,db):
 
 @app.get('/restaurants/{rid}')
 def restaurant(rid:int,db=Depends(db_session)):
-    r = restaurant_or_404(db,rid)
+    contact_trace=select(IngestionLog.trace).where(IngestionLog.restaurant_id==Restaurant.id,IngestionLog.trace.startswith('{"kind":"public_contact",',autoescape=True)).order_by(IngestionLog.id.desc()).limit(1).correlate(Restaurant).scalar_subquery()
+    row=db.execute(select(Restaurant,contact_trace).where(Restaurant.id==rid)).first()
+    if not row:raise HTTPException(404,'Restaurant not found')
+    r,contact=row
+    from .contact_enrichment import public_contact
+    restaurant_data=public(r);contact_info=public_contact(r.phone,contact)
+    if contact_info:restaurant_data['phone_source']=contact_info
     menu=db.scalars(select(MenuItem).where(MenuItem.restaurant_id==rid)).all()
     evidence={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([m.id for m in menu])))} if menu else {}
     from .menu_provenance import source_metadata
     price_sources=source_metadata(db,evidence)
-    return {'restaurant':public(r),'menu':[menu_details(db,m,evidence_by_id=evidence,restaurant_row=r,source_metadata_by_id=price_sources) for m in menu]}
+    return {'restaurant':restaurant_data,'menu':[menu_details(db,m,evidence_by_id=evidence,restaurant_row=r,source_metadata_by_id=price_sources) for m in menu]}
 
 @app.post('/restaurants/{rid}/click')
 def click(rid:int,body:ClickInput|None=None,user=Depends(optional_user),db=Depends(db_session)):
