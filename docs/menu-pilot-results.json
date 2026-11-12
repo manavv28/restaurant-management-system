@@ -177,6 +177,16 @@
     "content_hash": "02da2d484259c83495f44b0335618c40cdcceb6f097f31654a9bcddcddb5c935",
     "origin": "Operator public publisher HTTPS inspection; robots respected",
     "automatic_refresh": "Blocked by publisher HTTP 403 from Render; unverified",
-    "release": "fd55f5415473"
+    "release": "fd55f5415473",
+    "verified_release": "a47fa39aae36"
+  },
+  "live_verification": {
+    "public_origins_verified": true,
+    "menu_items": 91,
+    "example_dish": "Spicy jackfruit dumpling",
+    "example_price_paise": 59500,
+    "budget_paise": 100000,
+    "integration_run": 43191707994,
+    "live_browser_run": 43191707700
   }
 }

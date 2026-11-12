@@ -41,7 +41,7 @@ The CLI writes a review report only and does not modify the database. Native ins
 
 ## Live pilot and refresh limitation
 
-Release `fd55f5415473` is deployed on the selected Vercel frontend and Render Free backend. The reviewed publisher source is registered as source 6 for restaurant 24. Its direct Render fetch returned HTTP 403 (provider job 31); that failure remains visible and was not reported as a successful automated refresh.
+Initial pilot release `fd55f5415473` was deployed on the selected Vercel frontend and Render Free backend. The current verified release is `a47fa39aae36dc9ae4319e6db5da934e51afea02`. The reviewed publisher source is registered as source 6 for restaurant 24. Its direct Render fetch returned HTTP 403 (provider job 31); that failure remains visible and was not reported as a successful automated refresh.
 
 A fresh public-source inspection through the managed workspace retrieved the same official menu normally, with robots checks and no access challenge bypass. Its 91 validated price observations were imported as a separate operator snapshot (job 32, audit 1), retaining the actual content hash, observed time and 48-hour expiry. The snapshot contains facts only; publisher descriptions and menu images are not republished. Both live API origins returned all 91 menu items and a real Chinese-under-₹1500 budget match, with a fresh-source label. The nine remaining restaurants were left unpriced.
 
@@ -52,3 +52,11 @@ Automatic refresh from Render remains unverified because of the publisher's HTTP
 Initial local PostgreSQL suite: 72 passed. Hosted pilot CI run 43188463058 passed 71 tests with one native-PDF test skipped because the hosted runner lacks pdftotext; the native-PDF test passed locally. All 14 browser journeys, production frontend build, Docker build and non-root image smoke passed. Release integration run 43189179162 and live public-browser run 43189179394 passed. No database migration was required.
 
 Live-data checks exposed redundant queries per dish and an inaccurate owner-supplied search explanation for publisher prices. The follow-up batches evidence, chooses the best dish before loading restaurant offers/details, and labels published-menu observations correctly. A 90-dish regression check bounds search reads and restaurant-menu reads; the updated local PostgreSQL suite passes 73 tests.
+
+## Final public verification
+
+Current release `a47fa39aae36` is live on Render Free and the selected Vercel project. Both public origins returned all 91 fresh source observations and the exact query “Find spicy jackfruit dumpling under ₹1000 within 2 km in Bandra” matched Hakkasan’s Spicy jackfruit dumpling at ₹595, with the published-menu explanation. Menu retrieval is batched rather than issuing one evidence query per dish. Existing email configuration remains enabled; Supabase verify-full TLS is unchanged.
+
+[Final integration run 43191707994](https://github.com/manavv28/restaurant-management-system/actions/runs/43191707994) and [final live-browser run 43191707700](https://github.com/manavv28/restaurant-management-system/actions/runs/43191707700) passed. The follow-up CI passed 72 PostgreSQL tests with one native-PDF test skipped on the runner, all 14 browser journeys, frontend build, production Docker build and non-root database-backed smoke. Local PostgreSQL ran all 73 tests, including native PDF extraction. No schema migration was introduced.
+
+Snapshot observation: 12 November 2026, 14:46 IST; expiry: 14 November 2026, 14:46 IST unless refreshed. The successful operator snapshot and failed Render provider job remain distinct. Automatic refresh and all-restaurant menu coverage are still unverified.

@@ -11,7 +11,7 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 - [x] DNS TXT proof of restaurant website control; changing the website invalidates verification. This proves domain control, not legal merchant identity.
 - [x] Approved menu-link discovery, structured menu extraction, evidence-checked Gemini adapter, category classification, price-change audits and source controls.
 - [x] Live OSM collection: **378 distinct real records across Bandra, Andheri, Powai, Colaba and Dadar**, imported with source attribution and actual collection-job traces into Supabase. Two transient provider failures succeeded on the bounded retry run.
-- [x] Honest handling of unknown menus/prices. None were inferred from OSM. Current source-backed menu-price coverage remains zero.
+- [x] Honest handling of unknown menus/prices. None were inferred from OSM. Current pilot coverage is 91 source-observed dishes for one restaurant; other listings may remain unpriced. See [MENU_PILOT.md](MENU_PILOT.md).
 - [x] Price/distance/rating ranking and saved-cuisine recommendations.
 - [x] Missing-match follow-up and optional Google Places fallback that labels discoveries as unpriced and does not persist provider content indefinitely.
 - [x] Popular-dish and recommendation panels; cards support source/freshness, photos/attribution, ratings/review counts, contacts, directions, external menu/ordering links and eligible offers.
@@ -40,7 +40,7 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 
 See [REQUIRED_CONFIGURATION.md](REQUIRED_CONFIGURATION.md) for the exact inputs, secure environment-variable placement, and follow-up validation.
 
-- [ ] Approve restaurant website domains, collect real menus/prices, and verify the complete real dish/budget-match journey. Discovery metadata is present, but source-backed menu-price coverage is currently zero; prices cannot be fabricated or collected from unapproved hosts.
+- [ ] Approve restaurant website domains, collect real menus/prices, and verify the complete real dish/budget-match journey. The 10-listing Bandra pilot added 91 source-observed Hakkasan dishes and verified a real budget match. Broader coverage remains incomplete; automatic Render refresh is blocked by publisher HTTP 403. Prices cannot be fabricated or collected from unapproved hosts.
 - [ ] Configure Gemini and Google Places keys and validate real provider responses/quotas. Optional Google Maps rendering requires a referrer-restricted browser key. Deterministic text search and Leaflet work without these keys.
 - [ ] Configure TLS SMTP, sender identity and PUBLIC_APP_URL; verify actual email delivery and a real verification/reset email. No email was sent to a real user during tests.
 - [ ] Complete legal merchant onboarding/settlement/routing and validate Razorpay sandbox captures/refunds/disputes end to end before enabling charges. Signed fixtures validate application behavior; they are not provider certification.
@@ -82,3 +82,11 @@ The verification button did submit requests, but Render Free blocks Gmail SMTP p
 ## Email relay activation verified, 12 November 2026
 
 User approved activation explicitly; PR #6 merged. Production release `381d7c93dffc` is live on the selected Vercel project and Render Free backend. The server-only signing key is stored in both production services, and Render uses authenticated HTTPS for mail delivery. A real operator test returned HTTP 200 after Gmail accepted the message for letsbiteai@gmail.com. Unsigned relay access returned HTTP 401. Hosted integration run 43184829303 and live-browser run 43184829421 both passed. Supabase and Render Free are retained. Email configuration is enabled; inbox placement and the user's actual verification/reset link completion remain unconfirmed. See [EMAIL_DELIVERY.md](EMAIL_DELIVERY.md) for the active credential flow.
+
+## Priced-menu pilot verified, 12 November 2026
+
+PRs #7 and #8 are merged. Release `a47fa39aae36` is live on both selected services, with Render Free and Supabase retained. Ten Bandra-area listings were investigated; one provided 91 explicit INR prices. The other nine remain unpriced due to missing prices, unavailable sources or branch mismatches. PDF/image inspection produces review candidates only.
+
+Direct Render collection of the approved Hakkasan URL hit HTTP 403 (job 31). A separately fetched public publisher snapshot was imported with its actual hash, source time and 48-hour expiry (job 32, audit 1). This is not reported as a successful automatic refresh. Both live APIs matched Spicy jackfruit dumpling at ₹595 under a ₹1000 budget and returned all 91 source-backed menu items. The snapshot expires on 14 November 2026 at 14:46 IST unless refreshed.
+
+Local PostgreSQL: 73 passed. Hosted follow-up: 72 passed, one native-PDF-only skip; 14 browser journeys, frontend/Docker builds and image smoke passed. Final release integration run 43191707994 and live-browser run 43191707700 passed. The new price-data query regression prevents per-dish read growth. [MENU_PILOT.md](MENU_PILOT.md) records sources, evidence and remaining limits. Google Places keys, broader menu coverage, automatic source refresh and the other external-configuration checkpoints remain outstanding.
