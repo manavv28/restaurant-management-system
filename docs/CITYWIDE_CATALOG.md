@@ -36,3 +36,5 @@ Public attribution is also available on `/data-sources`.
 ## Verified production result
 
 The live catalog has **10,404 listings across 48 search areas**, with 10,155 linked Overture identities and all 91 existing Hakkasan menu items preserved. Database size after import was 39 MB. [Production evidence](catalog/mumbai-2026-11-12-production.json) includes the release, deployments, migration checksum, batch results and test references. Both public origins serve the directory and full licence notices.
+
+Search coverage and collection scope are independent. The worker seeds only the original five OSM sources by default; any additional area requires an explicit `--osm-area` selection. The citywide extract is an offline operator import, not a burst of new public Overpass polling. An integration audit caught 43 newly auto-seeded sources after the area expansion; they had no successful collections, were disabled, and their pending jobs were cancelled. Listings, menus and provenance were unchanged. Disabled jobs now finish without retrying.

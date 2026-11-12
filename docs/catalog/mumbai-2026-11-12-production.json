@@ -1,5 +1,5 @@
 {
-  "release": "aa43bccd3d1d8da0cb1927e1364633eb0a2d9645",
+  "release": "5a8a345196e4362b4a6d6fa644a0890e6a8e197d",
   "date": "2026-11-12",
   "database": {
     "real_listings": 10404,
@@ -17,12 +17,12 @@
   "render": {
     "service_id": "srv-dbo7mrjm8hqs73fpmcug",
     "plan": "free",
-    "deployment_id": "dep-dbqt5gbm8hqs73d4ia90",
+    "deployment_id": "dep-dbqtdrom7kps73dn3n50",
     "state": "live"
   },
   "vercel": {
     "project_id": "prj_7Y9jBQeV7u8dXVNFipUBOoN97Lu2",
-    "deployment_id": "dpl_hnsvuypj1kCZEp8aBPTpSXNhUasF",
+    "deployment_id": "dpl_D6ormnYcEodUA5sYviDV6QQn1W31",
     "state": "READY",
     "url": "https://restaurant-management-system-qxtx.vercel.app"
   },
@@ -146,15 +146,23 @@
     "menu_prices_inferred": 0
   },
   "tests": {
-    "local_postgresql_passed": 77,
-    "hosted_postgresql_passed": 76,
+    "local_postgresql_passed": 79,
+    "hosted_postgresql_passed": 78,
     "hosted_native_pdf_skip": 1,
     "browser_tests_passed": 19,
     "full_dataset_import_and_replay": true,
     "production_directory_filter_pagination_modal_mobile": true,
     "licence_files_served_both_origins": true,
-    "integration_run": 43241714809,
-    "public_browser_run": 43241714951
+    "integration_run": 43244710642,
+    "public_browser_run": 43244710830,
+    "directory_click_recorded_without_search_attribution": true
   },
-  "limitations": "Source-backed listings, not a verified census. Existing OSM duplicates and provider spelling/category/coordinate errors may remain. Menu prices exist for one restaurant only."
+  "limitations": "Source-backed listings, not a verified census. Existing OSM duplicates and provider spelling/category/coordinate errors may remain. Menu prices exist for one restaurant only.",
+  "collection_scope": {
+    "enabled_sources": 6,
+    "enabled_osm_sources": 5,
+    "unintended_osm_sources_disabled": 43,
+    "active_disabled_source_jobs": 0,
+    "extra_search_areas_do_not_seed_collection": true
+  }
 }
