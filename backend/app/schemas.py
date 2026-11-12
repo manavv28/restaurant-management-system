@@ -25,7 +25,7 @@ class SearchInput(BaseModel):
 class RestaurantInput(BaseModel):
     name: str = Field(min_length=2,max_length=150)
     address: str = Field(min_length=5,max_length=500)
-    area: Literal['Bandra','Andheri','Powai','Colaba','Dadar']
+    area: str = Field(max_length=80)
     latitude: float = Field(ge=18.85,le=19.35)
     longitude: float = Field(ge=72.75,le=73.05)
     cuisine: str = Field(min_length=2,max_length=100)
@@ -36,6 +36,12 @@ class RestaurantInput(BaseModel):
     image_url: str = Field(default='',max_length=1000)
     image_attribution: str = Field(default='',max_length=500)
     ordering_url: str = Field(default='',max_length=1000)
+    @field_validator('area')
+    @classmethod
+    def supported_area(cls,value):
+        from .areas import AREAS
+        if value not in AREAS: raise ValueError('Choose a supported Mumbai area')
+        return value
     @field_validator('website','image_url','ordering_url')
     @classmethod
     def safe_url(cls,value):

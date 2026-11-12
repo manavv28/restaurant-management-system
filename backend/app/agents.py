@@ -6,7 +6,7 @@ from sqlalchemy import select,or_,and_
 from .database import Restaurant, MenuItem, MenuEvidence, now
 
 log = logging.getLogger('biteai.agents')
-AREAS = {'Bandra': (19.0596,72.8295), 'Andheri': (19.1197,72.8464), 'Powai': (19.1176,72.9060), 'Colaba': (18.9067,72.8147), 'Dadar': (19.0180,72.8478)}
+from .areas import AREAS
 class Intent(BaseModel):
     cuisine: str | None = None
     dish: str | None = None
@@ -27,7 +27,7 @@ def parse_local(query, budget=500, radius=5):
     dish = next((d for d in dishes if d in q), None)
     money = re.search(r'(?:under|below|budget(?: of)?|less than|for|₹|rs\.?)[\s₹]*(\d+)', q)
     km = re.search(r'(\d+(?:\.\d+)?)\s*(?:km|kilomet)', q)
-    location = next((a for a in AREAS if a.lower() in q), None)
+    location = next((a for a in sorted(AREAS,key=len,reverse=True) if re.search(r"(?<!\w)"+re.escape(a.lower())+r"(?!\w)",q)), None)
     if not dish and not cuisine:
         custom=re.search(r'(?:craving|want|find|eat(?:ing)?|get)\s+(?:some\s+)?(.+?)(?=\s+(?:under|below|within|near|in)\b|$)',q)
         if custom and len(custom[1].split())<=5 and not any(c.lower()==custom[1].strip() for c in cuisines):dish=custom[1].strip(' .?!') or None

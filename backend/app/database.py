@@ -252,3 +252,14 @@ class PaymentAdjustment(Base):
     kind: Mapped[str] = mapped_column(String(40))
     amount_paise: Mapped[int] = mapped_column(Integer)
     created_at: Mapped[str] = mapped_column(String(40), default=now)
+
+class CatalogIdentity(Base):
+    """Provider aliases retain provenance without replacing existing restaurant IDs."""
+    __tablename__ = 'catalog_identities'
+    provider: Mapped[str] = mapped_column(String(32), primary_key=True)
+    external_id: Mapped[str] = mapped_column(String(200), primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'), index=True)
+    source_url: Mapped[str] = mapped_column(Text)
+    licence: Mapped[str] = mapped_column(Text)
+    observed_at: Mapped[str] = mapped_column(String(40))
+    details: Mapped[str] = mapped_column(Text, default='{}')
