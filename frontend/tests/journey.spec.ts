@@ -129,7 +129,9 @@ test('hosted checkout callback waits for verified server status',async({page})=>
 
 test('location permission sets coordinates and denial keeps text search available',async({page,context})=>{
  await context.grantPermissions(['geolocation']);await context.setGeolocation({latitude:19.0596,longitude:72.8295});
- await page.goto('/');await page.getByRole('button',{name:'Use my location',exact:true}).click();
+ await page.goto('/');
+ await expect(page.getByRole('button',{name:'Find my food',exact:true})).toBeEnabled();
+ await page.getByRole('button',{name:'Use my location',exact:true}).click();
  await expect(page.getByRole('button',{name:'GPS location set'})).toBeVisible();
  const request=page.waitForRequest(r=>r.url().endsWith('/api/search')&&r.method()==='POST');
  await page.getByRole('button',{name:'Find my food'}).click();
