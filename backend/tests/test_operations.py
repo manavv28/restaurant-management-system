@@ -4,6 +4,7 @@ import os
 import shutil
 import subprocess
 import pytest
+from test_api import client
 
 spec=importlib.util.spec_from_file_location('backup',Path(__file__).resolve().parents[2]/'scripts/encrypted_backup.py')
 backup=importlib.util.module_from_spec(spec);spec.loader.exec_module(backup)
@@ -70,3 +71,41 @@ def test_health_retries_and_sends_only_failure_origins(monkeypatch):
     assert len(attempts)==4 and len(sent)==1
     assert 'https://biteai-demo.onrender.com' in sent[0].get_content()
     assert 'qxtx.vercel.app' not in sent[0].get_content()
+
+
+def test_security_email_uses_signed_https_relay_without_redirects(monkeypatch):
+    import hashlib,hmac,json
+    from app import account_security as security
+    secret='isolated-relay-secret-'+'a'*32
+    for key,value in {'EMAIL_TRANSPORT':'https-relay','EMAIL_RELAY_SECRET':secret,'EMAIL_RELAY_URL':'https://restaurant-management-system-qxtx.vercel.app/api/internal/security-mail','PUBLIC_APP_URL':'https://restaurant-management-system-qxtx.vercel.app','SMTP_PASSWORD':'abcdefghijklmnop'}.items():
+        monkeypatch.setenv(key,value)
+    sent=[]
+    class Client:
+        def __init__(self,**kwargs):assert kwargs['follow_redirects'] is False
+        def __enter__(self):return self
+        def __exit__(self,*args):pass
+        def post(self,url,content,headers):
+            sent.append(json.loads(content))
+            expected=hmac.new(secret.encode(),(headers['X-BiteAI-Mail-Time']+'.'+content).encode(),hashlib.sha256).hexdigest()
+            assert hmac.compare_digest(expected,headers['X-BiteAI-Mail-Signature'])
+            return type('Response',(),{'status_code':200})()
+    monkeypatch.setattr(security.httpx,'Client',Client)
+    assert security.mail_enabled()
+    security.send_security_email('fixture@example.test','verify','a'*43)
+    assert sent[0]['purpose']=='verify'
+    monkeypatch.setenv('EMAIL_RELAY_URL','https://untrusted.example/relay')
+    assert not security.mail_enabled()
+
+
+def test_operator_mail_test_is_private_and_fixed_recipient(client,monkeypatch):
+    from app import account_security as security
+    secret='isolated-mail-operator-secret-'+'x'*32
+    monkeypatch.setenv('EMAIL_TRANSPORT','https-relay')
+    monkeypatch.setenv('EMAIL_RELAY_SECRET',secret)
+    assert client.post('/internal/email-test').status_code==404
+    assert client.post('/internal/email-test',headers={'Authorization':'Bearer wrong'}).status_code==404
+    sent=[]
+    monkeypatch.setattr(security,'send_security_email',lambda email,purpose,token:sent.append((email,purpose)))
+    response=client.post('/internal/email-test',headers={'Authorization':'Bearer '+secret})
+    assert response.status_code==200 and sent==[('letsbiteai@gmail.com','test')]
+    assert secret not in response.text
