@@ -74,3 +74,26 @@ def test_import_sql_repeats_without_changing_metadata_or_menus(client):
         assert db.scalar(text("select count(*) from restaurants where source_id=:sid"),{'sid':new['source_id']})==1
         assert db.scalar(text("select count(*) from catalog_identities"))==2
         assert db.scalar(text("select restaurant_id from catalog_identities where external_id=:id"),{'id':row['external_id']})==rid
+
+def test_search_area_expansion_does_not_expand_provider_collection(client):
+    from app.catalog_worker import seed_osm_sources,DEFAULT_OSM_AREAS
+    from app.database import Session,CatalogSource
+    from sqlalchemy import select
+    with Session() as db:
+        seed_osm_sources(db);seed_osm_sources(db)
+        rows=db.scalars(select(CatalogSource).where(CatalogSource.kind=='osm')).all()
+        assert {r.area for r in rows}==set(DEFAULT_OSM_AREAS)
+        assert len(rows)==5
+        seed_osm_sources(db,['Borivali'])
+        assert len(db.scalars(select(CatalogSource).where(CatalogSource.kind=='osm')).all())==6
+
+def test_disabled_collection_job_finishes_without_retry_or_provider_call(client):
+    import asyncio
+    from app.catalog_worker import run_one
+    from app.database import Session,CatalogSource,CatalogJob
+    with Session() as db:
+        source=CatalogSource(kind='osm',url='https://invalid.example.test',area='Borivali',permission_note='Synthetic fixture',enabled=False)
+        db.add(source);db.flush();db.add(CatalogJob(source_id=source.id));db.commit()
+    result=asyncio.run(run_one())
+    assert result['state']=='failed' and result['error']=='Source disabled'
+    assert asyncio.run(run_one()) is None
