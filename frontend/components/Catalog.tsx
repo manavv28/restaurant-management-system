@@ -1,5 +1,6 @@
 'use client';
 import {useEffect,useState,FormEvent} from 'react';
+import {BookOpen,ChevronDown,ArrowUpRight} from 'lucide-react';
 import {apiRequest} from '../shared/api';
 type Coverage={real_restaurants:number;source_priced_restaurants?:number;sample_restaurants:number;fresh_source_menu_items:number;last_successful_collection:string|null;coverage:string;attribution:string};
 export function CatalogCoverage(){
@@ -64,9 +65,9 @@ export function CatalogDirectory({areas,onSelect}:{areas:string[];onSelect:(id:n
    .finally(()=>{if(active)setBusy(false)});
   return()=>{active=false;controller.abort()};
  },[open,filter,cursor,retry]);
- return <section className="panel" aria-label="Mumbai restaurant directory"><button type="button" aria-expanded={open} onClick={()=>setOpen(value=>!value)}>{open?'Hide':'Browse'} Mumbai restaurant directory</button>{open&&<>
+ return <section className="panel directory-panel" aria-label="Mumbai restaurant directory"><button className="section-toggle" type="button" aria-controls="directory-content" aria-expanded={open} onClick={()=>setOpen(value=>!value)}><span className="section-toggle-icon"><BookOpen size={20}/></span><span>{open?'Hide':'Browse'} Mumbai restaurant directory<small aria-hidden="true">Explore the city, one neighbourhood at a time</small></span><ChevronDown size={18} className={open?'chevron-open':''}/></button>{open&&<div id="directory-content">
   <p>Explore restaurants, cafés, bakeries and eateries. Listings may be outdated. Menu prices are available for some venues only.</p>
-  <form onSubmit={event=>{event.preventDefault();setCursor(0);setFilter({q,area})}}><label>Restaurant name <input value={q} maxLength={150} onChange={event=>setQ(event.target.value)}/></label><label>Search area <select value={area} onChange={event=>setArea(event.target.value)}><option value="">All Mumbai</option>{areas.map(name=><option key={name}>{name}</option>)}</select></label><button type="submit" disabled={busy}>Search directory</button></form>
-  {busy?<p role="status">Loading listings…</p>:error?<p role="alert">{error} <button type="button" onClick={()=>setRetry(value=>value+1)}>Retry directory</button></p>:<><ul>{rows.map(row=><li key={row.id}><button type="button" onClick={()=>onSelect(row.id)}>{row.name}</button> · {row.area} · {row.address}</li>)}</ul>{rows.length===0&&<p>No listings match this name and area.</p>}<button type="button" disabled={!cursor} onClick={()=>setCursor(0)}>First page</button> <button type="button" disabled={next===null} onClick={()=>{if(next!==null)setCursor(next)}}>Next page</button></>}
- </>}</section>;
+  <form className="directory-search" onSubmit={event=>{event.preventDefault();setCursor(0);setFilter({q,area})}}><label>Restaurant name <input value={q} maxLength={150} onChange={event=>setQ(event.target.value)}/></label><label>Search area <select value={area} onChange={event=>setArea(event.target.value)}><option value="">All Mumbai</option>{areas.map(name=><option key={name}>{name}</option>)}</select></label><button className="primary" type="submit" disabled={busy}>Search directory</button></form>
+  {busy?<p role="status">Loading listings…</p>:error?<p role="alert">{error} <button type="button" onClick={()=>setRetry(value=>value+1)}>Retry directory</button></p>:<><ul className="directory-list">{rows.map(row=><li key={row.id}><button type="button" className="directory-result" aria-label={row.name} onClick={()=>onSelect(row.id)}><span><strong>{row.name}</strong><small>{row.area} · {row.address}</small></span><ArrowUpRight size={18}/></button></li>)}</ul>{rows.length===0&&<p>No listings match this name and area.</p>}<button type="button" disabled={!cursor} onClick={()=>setCursor(0)}>First page</button> <button type="button" disabled={next===null} onClick={()=>{if(next!==null)setCursor(next)}}>Next page</button></>}
+ </div>}</section>;
 }

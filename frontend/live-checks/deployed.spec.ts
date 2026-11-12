@@ -20,3 +20,16 @@ test('public release serves the real catalog, source details and a responsive mo
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await page.screenshot({path:'test-results/live-mobile.png',fullPage:true});
 });
+
+test('the original noodles request respects price, radius and real-source constraints',async({request})=>{
+ const response=await request.post('/api/search',{data:{query:'Chinese Haka noodles for 300 within 2 km in Bandra',area:'Bandra',include_samples:false}});
+ expect(response.ok()).toBeTruthy();const data=await response.json();
+ expect(data.intent).toMatchObject({dish:'hakka noodles',max_budget:300,radius_km:2,location:'Bandra'});
+ // Missing catalogue dishes must remain an honest empty result; never substitute a fictional match.
+ for(const row of data.results){
+  expect(row.restaurant.sample).toBe(false);expect(row.distance_km).toBeLessThanOrEqual(2);
+  expect(row.dish.price_paise).toBeGreaterThan(0);expect(row.dish.price_paise).toBeLessThanOrEqual(30000);
+  expect(row.dish.name.toLowerCase()).toContain('hakka noodles');expect(row.dish.source).toBeTruthy();
+ }
+ expect(data.trace.length).toBeGreaterThan(0);
+});
