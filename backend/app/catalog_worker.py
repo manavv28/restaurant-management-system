@@ -10,6 +10,17 @@ from .database import Base, engine, Session, CatalogSource, CatalogJob, now
 from .catalog import future, discover_osm, import_osm, fetch_menu, structured_menu, ai_menu, persist_menu, OSM_URL
 from .agents import AREAS
 
+# UI search coverage must never silently expand public-provider collection.
+DEFAULT_OSM_AREAS=('Bandra','Andheri','Powai','Colaba','Dadar')
+
+def seed_osm_sources(db,areas=None):
+    selected=DEFAULT_OSM_AREAS if areas is None else tuple(areas)
+    if any(area not in AREAS for area in selected):raise ValueError('Unknown collection area')
+    for area in selected:
+        if not db.scalar(select(CatalogSource.id).where(CatalogSource.kind=='osm',CatalogSource.area==area)):
+            db.add(CatalogSource(kind='osm',url=OSM_URL,area=area,permission_note='OpenStreetMap ODbL; retain attribution and comply with database share-alike obligations',refresh_hours=168))
+    db.commit()
+
 def schedule(db):
     queued=0
     for source in db.scalars(select(CatalogSource).where(CatalogSource.enabled.is_(True))).all():
@@ -82,7 +93,7 @@ async def run_one():
             if isinstance(exc,httpx.HTTPStatusError):error=f'Provider returned HTTP {exc.response.status_code}'
             elif isinstance(exc,ValueError):error=str(exc)[:200]
             else:error=f'{type(exc).__name__}: source operation failed'
-            job.error=error;job.state='queued' if job.attempts<3 else 'failed'
+            job.error=error;job.state='queued' if job.attempts<3 and source and source.enabled else 'failed'
             delay=2**job.attempts/60
             if isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code==429:
                 try:delay=max(delay,float(exc.response.headers.get('Retry-After','3600'))/3600)
@@ -95,6 +106,7 @@ async def run_one():
 def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--seed-osm',action='store_true')
+    parser.add_argument('--osm-area',action='append',choices=tuple(AREAS),help='Explicit collection area; defaults to the original five, independently of search coverage')
     parser.add_argument('--schedule',action='store_true')
     parser.add_argument('--once',action='store_true')
     parser.add_argument('--loop',action='store_true')
@@ -103,11 +115,7 @@ def main():
     if os.getenv('AUTO_CREATE_SCHEMA','false' if os.getenv('APP_ENV')=='production' else 'true').lower()=='true':
         Base.metadata.create_all(engine)
     with Session() as db:
-        if args.seed_osm:
-            for area in AREAS:
-                if not db.scalar(select(CatalogSource.id).where(CatalogSource.kind=='osm',CatalogSource.area==area)):
-                    db.add(CatalogSource(kind='osm',url=OSM_URL,area=area,permission_note='OpenStreetMap ODbL; retain attribution and comply with database share-alike obligations',refresh_hours=168))
-            db.commit()
+        if args.seed_osm:seed_osm_sources(db,args.osm_area)
         if args.schedule:print(json.dumps({'queued':schedule(db)}))
     if args.loop:
         async def loop():
