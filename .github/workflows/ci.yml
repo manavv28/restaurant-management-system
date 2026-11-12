@@ -90,6 +90,12 @@ jobs:
           assert result['payment_simulation'] is False
           PY
           test "$(docker exec biteai-ci id -u)" = 10001
+          python - <<'PYVERIFY'
+          from urllib.request import urlopen
+          for filename,expected in [('Apache-2.0.txt','Apache License'),('CDLA-Permissive-2.0.txt','Conditions for Sharing Data'),('Foursquare-NOTICE.txt','Foursquare')]:
+              with urlopen('http://127.0.0.1:10000/notices/'+filename,timeout=10) as response:
+                  assert response.status==200 and expected in response.read().decode(),filename
+          PYVERIFY
       - name: Capture failure diagnostics
         if: failure()
         run: |
