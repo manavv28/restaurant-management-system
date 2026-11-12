@@ -14,3 +14,11 @@ The previous client parsed every response as JSON and loaded coverage only once.
 There is no background keep-alive or hosting-plan change. Render Free can still sleep and require startup time. Supabase, publisher snapshots, email settings and API authentication are unchanged.
 
 Validation before release: all 17 local Playwright tests passed, including simulated HTML cold-start responses, delayed health readiness, single search submission, useful HTML-error feedback, stale-zero coverage refresh, and existing account/consent/location/checkout journeys. The Next.js production build/TypeScript checks passed. Hosted CI and deployment verification are recorded after release.
+
+## Deployed verification
+
+PR #9 is merged. Release `25cd602bb39e91880d91fe8eb295f63a250a5f9e` is live on the selected Vercel frontend and Render Free backend. [Hosted integration run 43205988098](https://github.com/manavv28/restaurant-management-system/actions/runs/43205988098) and [public mobile-browser run 43205988068](https://github.com/manavv28/restaurant-management-system/actions/runs/43205988068) passed. All 17 browser tests passed locally with two workers and in hosted CI, with production build/typecheck and Docker/image smoke verification. The map restaurant list is memoized so unrelated startup/account/query-input updates preserve the open popup; a regression test exercises that behavior.
+
+Both public API origins report 91 fresh source observations and return Spicy jackfruit dumpling at ₹595 for the exact screenshot query, “Find spicy jackfruit dumpling under 1000 in Bandra”. The public JavaScript build contains the new startup handling. Existing email availability remains enabled, Supabase uses verify-full TLS, and no data or credentials were changed for this fix. The publisher's separate HTTP 403 refresh limitation and original snapshot expiry remain unchanged.
+
+An already-open page needs one refresh to load the new client code. Future focus/visibility and successful searches refresh coverage without a page reload. Free-service startup can still take time; the UI waits and reports unavailable responses safely rather than displaying a raw JSON parser error.
