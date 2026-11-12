@@ -57,7 +57,7 @@ def capture_manifest(user_id):
         with Session() as db:
             connection=db.get(ProviderConnection,(user_id,'zomato'))
             if not connection or connection.expires_at<=now():return
-            tokens=unseal(connection.encrypted_tokens,user_id);db.commit()
+            tokens=unseal(connection.encrypted_tokens,user_id,'zomato');db.commit()
             manifest=read_tool(tokens['access_token'],None,{},provider='zomato',list_tools=True).get('tools')
             if not isinstance(manifest,list) or len(manifest)>100:return
             cleaned=[{k:tool[k] for k in ('name','description','inputSchema','outputSchema','annotations') if k in tool} for tool in manifest if isinstance(tool,dict)]
@@ -70,7 +70,7 @@ def callback(request:Request,background:BackgroundTasks,state:str=Query(default=
     require_enabled()
     flow=db.scalar(select(ProviderOAuthState).where(ProviderOAuthState.id==hashlib.sha256(state.encode()).hexdigest(),ProviderOAuthState.user_id==user.id,ProviderOAuthState.session_id==request.state.session_id,ProviderOAuthState.expires_at>now()).with_for_update())
     if not flow:db.rollback();raise HTTPException(400,'Zomato connection expired. Please connect again.')
-    details=unseal(flow.encrypted_flow,user.id)
+    details=unseal(flow.encrypted_flow,user.id,'zomato')
     if details.get('provider')!='zomato':db.rollback();raise HTTPException(400,'Incorrect provider callback')
     db.delete(flow);db.commit()
     if not error:

@@ -23,14 +23,14 @@ CALLBACK='/api/platforms/swiggy/callback'
 def seal(value,user_id):
     key=hmac.new(SECRET.encode(),b'BiteAI/provider-tokens/v1',hashlib.sha256).digest()
     nonce=secrets.token_bytes(12)
-    body=AESGCM(key).encrypt(nonce,json.dumps(value,separators=(',',':')).encode(),str(user_id).encode())
+    body=AESGCM(key).encrypt(nonce,json.dumps(value,separators=(',',':')).encode(),(str(user_id)+':'+value.get('provider','swiggy')).encode())
     return base64.urlsafe_b64encode(nonce+body).decode()
 
-def unseal(value,user_id):
+def unseal(value,user_id,provider='swiggy'):
     try:
         raw=base64.urlsafe_b64decode(value)
         key=hmac.new(SECRET.encode(),b'BiteAI/provider-tokens/v1',hashlib.sha256).digest()
-        return json.loads(AESGCM(key).decrypt(raw[:12],raw[12:],str(user_id).encode()))
+        return json.loads(AESGCM(key).decrypt(raw[:12],raw[12:],(str(user_id)+':'+provider).encode()))
     except Exception:raise HTTPException(401,'Please reconnect Swiggy') from None
 
 def public_base():

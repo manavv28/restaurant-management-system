@@ -154,7 +154,7 @@ def test_zomato_pkce_provider_binding_and_schema_capture(client,configured,provi
     h=account(client);start=client.post('/platforms/zomato/connect',headers=h);assert start.status_code==200,start.text
     url=start.json()['authorization_url'];assert url.startswith('https://mcp-server.zomato.com/authorize?')
     state=parse_qs(urlsplit(url).query)['state'][0]
-    assert client.get('/platforms/swiggy/callback',params={'code':'synthetic','state':state},headers=h).status_code==400
+    assert client.get('/platforms/swiggy/callback',params={'code':'synthetic','state':state},headers=h).status_code in (400,401)
     result=client.get('/platforms/zomato/callback',params={'code':'synthetic','state':state},headers=h,follow_redirects=False);assert result.status_code==303,result.text
     status=client.get('/platforms/status',headers=h).json();assert status['zomato']['connected'] and status['zomato']['can_connect'] and not status['zomato']['available']
     assert not status['swiggy']['connected']
@@ -186,3 +186,12 @@ def test_mcp_returns_on_matching_sse_event_without_waiting_for_stream_close(monk
     real=httpx.Client
     monkeypatch.setattr(platforms.httpx,'Client',lambda **kwargs:real(transport=httpx.MockTransport(transport),**kwargs))
     assert platforms.read_tool('synthetic-token','search_restaurants',{'query':'Chinese'})=={'restaurants':[]}
+
+def test_encrypted_credentials_cannot_be_reassigned_to_another_provider(client,configured,provider,monkeypatch):
+    h=account(client);linked(client,h)
+    with Session() as db:
+        row=db.scalar(select(ProviderConnection));row.encrypted_tokens=platforms.seal({'provider':'zomato','access_token':'wrong-provider-private','refresh_token':'private','client_id':'fixture'},row.user_id);db.commit()
+    sent=[];monkeypatch.setattr(platforms,'read_tool',lambda *args:sent.append(args))
+    result=client.post('/platforms/swiggy/search',headers=h,json={'query':'Chinese'})
+    assert result.status_code==401 and not sent
+    assert 'wrong-provider-private' not in result.text
