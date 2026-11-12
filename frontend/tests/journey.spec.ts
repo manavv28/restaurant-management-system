@@ -133,12 +133,14 @@ test('hosted checkout callback waits for verified server status',async({page})=>
 test('location permission sets coordinates and denial keeps text search available',async({page,context})=>{
  await context.grantPermissions(['geolocation']);await context.setGeolocation({latitude:19.0596,longitude:72.8295});
  await page.goto('/');
+ // Hydration can briefly enable the form before the initial search starts.
+ await expect(page.getByRole('button',{name:'Wok & Wonder',exact:true})).toBeVisible();
  await expect(page.getByRole('button',{name:'Find my food',exact:true})).toBeEnabled();
  await page.getByRole('button',{name:'Use my location',exact:true}).click();
  await expect(page.getByRole('button',{name:'GPS location set'})).toBeVisible();
  const request=page.waitForRequest(r=>r.url().endsWith('/api/search')&&r.method()==='POST');
  await page.getByRole('button',{name:'Find my food'}).click();
- expect((await request).postDataJSON().latitude).toBe(19.0596);
+ const coordinates=(await request).postDataJSON();expect(coordinates.latitude).toBe(19.0596);expect(coordinates.longitude).toBe(72.8295);
  await page.addInitScript(()=>{Object.defineProperty(navigator,'geolocation',{value:{getCurrentPosition:(_success:unknown,failure:(error:{code:number})=>void)=>failure({code:1})}})});
  await page.reload();await page.getByRole('button',{name:'Use my location',exact:true}).click();
  await expect(page.getByRole('alert').filter({hasText:'Location access was declined'})).toContainText('Location access was declined');
