@@ -13,7 +13,7 @@ Under repository Settings → Secrets and variables → Actions, add:
 - `BACKUP_PASSPHRASE`: a randomly generated single-line secret of at least 32 characters. Keep a separate copy in your password manager. Losing it makes every retained backup unrecoverable; changing it requires retaining the old key for old backups.
 - `SMTP_PASSWORD`: a Gmail **App Password** for letsbiteai@gmail.com, created in Google Account security with two-step verification enabled. A normal Gmail account password will not work. Account policies may disallow App Passwords.
 
-In Render → biteai-demo → Environment, configure `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER=letsbiteai@gmail.com`, `EMAIL_FROM=letsbiteai@gmail.com` and the same App Password as `SMTP_PASSWORD`. Preserve the existing `PUBLIC_APP_URL`, `DATABASE_URL` and `JWT_SECRET`. Gmail supports a small initial setup; delivery quotas apply. A Gmail address cannot serve as a custom verified domain.
+**Render Free blocks direct SMTP.** Account security mail requires the authenticated HTTPS relay in [EMAIL_DELIVERY.md](EMAIL_DELIVERY.md); the GitHub runner can still use SMTP for alerts. For relay credentials in Render → biteai-demo → Environment, configure `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`, `SMTP_USER=letsbiteai@gmail.com`, `EMAIL_FROM=letsbiteai@gmail.com` and the same App Password as `SMTP_PASSWORD`. Preserve the existing `PUBLIC_APP_URL`, `DATABASE_URL` and `JWT_SECRET`. Gmail supports a small initial setup; delivery quotas apply. A Gmail address cannot serve as a custom verified domain.
 
 No credential should be pasted into chat or committed. Enter credential values in the account’s secure settings; the existing connections do not supply the missing database password or Gmail App Password.
 

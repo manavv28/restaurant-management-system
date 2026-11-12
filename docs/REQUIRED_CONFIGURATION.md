@@ -16,6 +16,8 @@ Do not paste secret values in chat, commit them, or upload a live .env file. Exi
 
 ### Render → biteai-demo → Environment
 
+**Render Free blocks SMTP ports.** Gmail settings alone cannot deliver mail from this backend. The prepared authenticated HTTPS relay and its explicit activation approval are documented in [EMAIL_DELIVERY.md](EMAIL_DELIVERY.md). The saved Gmail App Password can be reused through that server-only relay.
+
 | Purpose | Variable | Required access/configuration |
 |---|---|---|
 | Gemini query/menu extraction | GEMINI_API_KEY | A key for your Gemini project, with a quota/budget you control |

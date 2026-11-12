@@ -13,9 +13,20 @@ export function RecoveryForm(){
  return <section className="account-recovery">{!mode&&<button className="text-button" onClick={()=>setMode('forgot')}>Forgot your password?</button>}{mode&&<form onSubmit={submit}><h3>{mode==='reset'?'Choose a new password':mode==='verify'?'Verify your email':mode==='done'?'Account updated':'Reset your password'}</h3>{mode==='forgot'&&<><p>{enabled?'We’ll email a reset link if the account exists.':'Email delivery is not available yet. Please try again once the service is configured.'}</p><label>Recovery email<input name="email" type="email" required maxLength={254}/></label></>}{mode==='reset'&&<label>New password<input name="password" type="password" minLength={10} maxLength={128} required autoComplete="new-password"/></label>}{mode!=='done'&&<button className="secondary" disabled={busy||(mode==='forgot'&&!enabled)}>{mode==='verify'?'Confirm email verification':mode==='reset'?'Update password':'Send reset link'}</button>}<button type="button" className="text-button" onClick={()=>{setMode('');setMessage('');setToken('')}}>Close recovery</button></form>}{message&&<p role="status">{message}</p>}</section>;
 }
 export function EmailVerification({verified,onVerified}:{verified:boolean;onVerified:()=>void}){
- const [message,setMessage]=useState('');
- if(verified)return <p>Email verified.</p>;
- return <div><p>Your email has not been verified.</p><button className="secondary" onClick={async()=>{try{const data=await api('/me/request-verification',{});setMessage(data.message);onVerified()}catch(e){setMessage((e as Error).message)}}}>Send verification email</button>{message&&<p role="status">{message}</p>}</div>;
+ const [message,setMessage]=useState(''),[busy,setBusy]=useState(false),[failed,setFailed]=useState(false);
+ async function send(){
+  if(busy)return;
+  setBusy(true);setFailed(false);setMessage('Sending your verification email…');
+  const controller=new AbortController();const timeout=setTimeout(()=>controller.abort(),35000);
+  try{
+   const response=await fetch('/api/me/request-verification',{method:'POST',headers:{'Content-Type':'application/json','X-BiteAI-Client':'browser'},body:'{}',signal:controller.signal});
+   const data=await response.json();
+   if(!response.ok)throw new Error(response.status===429?'Too many requests. Wait five minutes before trying again.':response.status===401?'Your session expired. Sign in again.':typeof data.detail==='string'?data.detail:'Email could not be sent. Please try again later.');
+   setMessage('Verification email sent. Check your inbox and spam folder.');onVerified();
+  }catch(error){setFailed(true);setMessage(error instanceof Error&&error.name==='AbortError'?'Email delivery timed out. Please wait before trying again.':error instanceof Error?error.message:'Email could not be sent. Please try again later.')}
+  finally{clearTimeout(timeout);setBusy(false)}
+ }
+ return <section className="panel" aria-label="Email verification"><h2>Email verification</h2>{verified?<p>Email verified.</p>:<><p>Your email has not been verified.</p><button type="button" className="secondary" disabled={busy} onClick={send}>{busy?'Sending verification email…':'Send verification email'}</button>{message&&<p role={failed?'alert':'status'}>{message}</p>}</>}</section>;
 }
 export function OwnershipVerification({restaurantId,verified}:{restaurantId:number;verified:boolean}){
  const [challenge,setChallenge]=useState<{record_name:string;record_value:string}|null>(null),[message,setMessage]=useState(''),[done,setDone]=useState(verified);

@@ -1,5 +1,6 @@
 """Persistent throttling, one-use recovery tokens and TLS SMTP delivery."""
-import hashlib,hmac,os,secrets,ssl,smtplib,time
+import hashlib,hmac,json,os,secrets,ssl,smtplib,time
+import httpx
 from datetime import datetime,timedelta,timezone
 from email.message import EmailMessage
 from urllib.parse import urlsplit
@@ -30,12 +31,25 @@ def throttle_auth(db,request,email):
 
 def mail_enabled():
     base=os.getenv('PUBLIC_APP_URL','')
+    if os.getenv('EMAIL_TRANSPORT')=='https-relay':
+        return bool(os.getenv('SMTP_PASSWORD') and len(os.getenv('EMAIL_RELAY_SECRET',''))>=32
+                    and os.getenv('EMAIL_RELAY_URL')=='https://restaurant-management-system-qxtx.vercel.app/api/internal/security-mail'
+                    and base=='https://restaurant-management-system-qxtx.vercel.app')
     return bool(os.getenv('SMTP_HOST') and os.getenv('EMAIL_FROM')
                 and urlsplit(base).scheme=='https'
                 and (not os.getenv('SMTP_USER') or os.getenv('SMTP_PASSWORD')))
 
 def send_security_email(email,purpose,token):
     if not mail_enabled():raise RuntimeError('Email delivery is not configured')
+    if purpose not in ('verify','reset','test'):raise ValueError('Unsupported security email')
+    if os.getenv('EMAIL_TRANSPORT')=='https-relay':
+        raw=json.dumps({'to':email,'purpose':purpose,'token':token,'smtp_password':os.environ['SMTP_PASSWORD']},separators=(',',':'))
+        timestamp=str(int(time.time()))
+        signature=hmac.new(os.environ['EMAIL_RELAY_SECRET'].encode(),(timestamp+'.'+raw).encode(),hashlib.sha256).hexdigest()
+        with httpx.Client(timeout=25,follow_redirects=False) as client:
+            response=client.post(os.environ['EMAIL_RELAY_URL'],content=raw,headers={'Content-Type':'application/json','X-BiteAI-Mail-Time':timestamp,'X-BiteAI-Mail-Signature':signature})
+        if response.status_code!=200:raise RuntimeError('Email relay delivery failed')
+        return
     base=os.environ['PUBLIC_APP_URL'].rstrip('/')
     if urlsplit(base).scheme!='https':raise RuntimeError('Public email links require HTTPS')
     message=EmailMessage();message['From']=os.environ['EMAIL_FROM'];message['To']=email
@@ -56,7 +70,7 @@ def issue(db,user,purpose):
     except Exception:
         db.execute(delete(SecurityToken).where(SecurityToken.id==digest));db.commit()
         # Do not log addresses, SMTP responses or raw bearer tokens.
-        raise HTTPException(503,'Email delivery unavailable. Please try again later.') from None
+        raise HTTPException(503,'Email could not be sent. Please try again later or contact support.') from None
 
 def consume(db,value,purpose):
     digest=hashlib.sha256(value.encode()).hexdigest()
@@ -99,3 +113,14 @@ def verify(body:TokenInput,request:Request,db=Depends(db_session)):
     throttle(db,'verify-token',request.client.host if request.client else 'unknown',30)
     user=consume(db,body.token,'verify');user.email_verified=True;db.commit()
     return {'message':'Email verified.'}
+
+
+@router.post('/internal/email-test')
+def email_delivery_test(request:Request,db=Depends(db_session)):
+    secret=os.getenv('EMAIL_RELAY_SECRET','')
+    if os.getenv('EMAIL_TRANSPORT')!='https-relay' or len(secret)<32 or not hmac.compare_digest(request.headers.get('authorization',''),'Bearer '+secret):
+        raise HTTPException(404,'Not found')
+    throttle(db,'email-delivery-test','operator',1,300)
+    try:send_security_email('letsbiteai@gmail.com','test',secrets.token_urlsafe(32))
+    except Exception:raise HTTPException(503,'Email delivery test failed') from None
+    return {'message':'Gmail accepted the test email for letsbiteai@gmail.com. Check inbox and spam.'}
