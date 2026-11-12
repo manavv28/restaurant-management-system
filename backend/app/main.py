@@ -65,7 +65,7 @@ def logout(request:Request,response:Response,user=Depends(current_user),db=Depen
     return {'signed_out':True}
 
 def public(obj):
-    return {c.name:getattr(obj,c.name) for c in obj.__table__.columns if c.name != 'password_hash'}
+    return {c.name:getattr(obj,c.name) for c in obj.__table__.columns if c.name not in ('password_hash','source_key')}
 
 def restaurant_or_404(db, rid):
     r = db.get(Restaurant,rid)
@@ -169,6 +169,8 @@ def search_database(body,intent,parser,user,db):
     best={}
     for row in matches:best.setdefault(row[0].id,row)
     evidence_by_id={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([row[1].id for row in best.values()])))} if best else {}
+    from .menu_provenance import source_metadata
+    price_sources=source_metadata(db,evidence_by_id)
     campaigns={}
     if user and best:
         for campaign in db.scalars(select(Campaign).where(Campaign.restaurant_id.in_(list(best)))):
@@ -176,8 +178,9 @@ def search_database(body,intent,parser,user,db):
     unique=[]
     for r,item,distance in best.values():
         offers=[public(c) for c in campaigns.get(r.id,[]) if eligibility(db,user,c)['eligible']]
-        dish=menu_details(db,item,evidence_by_id=evidence_by_id,restaurant_row=r)
+        dish=menu_details(db,item,evidence_by_id=evidence_by_id,restaurant_row=r,source_metadata_by_id=price_sources)
         note='Fictional sample listing.' if r.sample else 'Price observed on the published menu; confirm with the restaurant.' if item.id in evidence_by_id else 'Owner supplied menu; price not independently verified.'
+        if dish.get('price_is_reference'):note='Third-party listed price; confirm the current price and ordering mode with the restaurant.'
         unique.append({'restaurant':public(r),'dish':dish,'distance_km':round(distance,2),'offers':offers,
                        'reason':f"{item.name} is within your ₹{intent.max_budget} budget and {intent.radius_km:g} km radius. "+note})
     trace += [{'agent':'Menu intelligence','tool':'database_price_and_dish_filter','output':{'matched_dishes':len(matches)}},
@@ -197,7 +200,9 @@ def restaurant(rid:int,db=Depends(db_session)):
     r = restaurant_or_404(db,rid)
     menu=db.scalars(select(MenuItem).where(MenuItem.restaurant_id==rid)).all()
     evidence={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([m.id for m in menu])))} if menu else {}
-    return {'restaurant':public(r),'menu':[menu_details(db,m,evidence_by_id=evidence,restaurant_row=r) for m in menu]}
+    from .menu_provenance import source_metadata
+    price_sources=source_metadata(db,evidence)
+    return {'restaurant':public(r),'menu':[menu_details(db,m,evidence_by_id=evidence,restaurant_row=r,source_metadata_by_id=price_sources) for m in menu]}
 
 @app.post('/restaurants/{rid}/click')
 def click(rid:int,body:ClickInput|None=None,user=Depends(optional_user),db=Depends(db_session)):
@@ -221,7 +226,12 @@ def clear_history(user=Depends(current_user),db=Depends(db_session)):
 @app.get('/me/favourites')
 def favourites(user=Depends(current_user),db=Depends(db_session)):
     rows = db.scalars(select(Favourite).where(Favourite.user_id==user.id)).all()
-    return [{**public(f),'restaurant':public(db.get(Restaurant,f.restaurant_id)),'dish':public(db.get(MenuItem,f.menu_item_id)) if f.menu_item_id else None} for f in rows]
+    restaurants={r.id:r for r in db.scalars(select(Restaurant).where(Restaurant.id.in_({f.restaurant_id for f in rows})))} if rows else {}
+    items={m.id:m for m in db.scalars(select(MenuItem).where(MenuItem.id.in_({f.menu_item_id for f in rows if f.menu_item_id})))} if rows else {}
+    evidence={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_(list(items))))} if items else {}
+    from .menu_provenance import source_metadata
+    metadata=source_metadata(db,evidence)
+    return [{**public(f),'restaurant':public(restaurants[f.restaurant_id]),'dish':menu_details(db,items[f.menu_item_id],evidence_by_id=evidence,restaurant_row=restaurants[f.restaurant_id],source_metadata_by_id=metadata) if f.menu_item_id in items else None} for f in rows]
 
 @app.post('/me/favourites/{rid}')
 def favourite(rid:int,menu_item_id:int=0,user=Depends(current_user),db=Depends(db_session)):
@@ -311,7 +321,7 @@ def update_menu(rid:int,mid:int,body:MenuInput,user=Depends(owner),db=Depends(db
     m=db.get(MenuItem,mid)
     if not m or m.restaurant_id != rid: raise HTTPException(404,'Menu item not found')
     for k,v in body.model_dump().items(): setattr(m,k,v)
-    m.verified_at=None
+    m.verified_at=None;m.source_key=None;m.source='Owner supplied; unverified'
     evidence=db.get(MenuEvidence,m.id)
     if evidence:db.delete(evidence)
     db.commit(); return public(m)
@@ -396,15 +406,15 @@ def profile(body:ProfileInput,user=Depends(current_user),db=Depends(db_session))
 
 @app.get('/catalog/coverage')
 def catalog_coverage(db=Depends(db_session)):
-    real=db.scalar(select(func.count()).select_from(Restaurant).where(Restaurant.sample.is_(False))) or 0
-    samples=db.scalar(select(func.count()).select_from(Restaurant).where(Restaurant.sample.is_(True))) or 0
-    active=db.scalar(select(func.count()).select_from(MenuEvidence).where(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now())) or 0
-    sources=db.scalar(select(func.count()).select_from(CatalogSource).where(CatalogSource.enabled.is_(True))) or 0
-    collection_times=[db.scalar(select(func.max(CatalogSource.checked_at))),db.scalar(select(func.max(CatalogIdentity.observed_at)))]
-    last=max((value for value in collection_times if value),default=None)
-    return {'real_restaurants':real,'sample_restaurants':samples,'fresh_source_menu_items':active,'enabled_sources':sources,'last_successful_collection':last,
-            'coverage':'Mumbai City and Mumbai Suburban listings; coverage is not exhaustive. Includes restaurants, cafés, bakeries and other eateries. Records may be outdated or lack menus and prices; not independently verified.',
-            'attribution':'Sources when present: Overture Maps contributors (CDLA Permissive 2.0, Apache 2.0, CC0); © OpenStreetMap contributors (ODbL). See data sources for notices.'}
+    real_counts=select(func.count().filter(Restaurant.sample.is_(False)).label('real_restaurants'),func.count().filter(Restaurant.sample.is_(True)).label('sample_restaurants')).subquery()
+    price_counts=select(func.count(MenuEvidence.menu_item_id).label('fresh_source_menu_items'),func.count(func.distinct(MenuItem.restaurant_id)).label('source_priced_restaurants')).select_from(MenuEvidence).join(MenuItem,MenuItem.id==MenuEvidence.menu_item_id).join(Restaurant,Restaurant.id==MenuItem.restaurant_id).where(MenuItem.available.is_(True),Restaurant.sample.is_(False),MenuEvidence.active.is_(True),MenuEvidence.expires_at>now()).subquery()
+    source_counts=select(func.count().filter(CatalogSource.enabled.is_(True)).label('enabled_sources'),func.max(CatalogSource.checked_at).label('last_source')).subquery()
+    statement=select(real_counts,price_counts,source_counts,select(func.max(CatalogIdentity.observed_at)).scalar_subquery().label('last_identity')).select_from(real_counts.join(price_counts,text('true')).join(source_counts,text('true')))
+    counts=dict(db.execute(statement).mappings().one())
+    last=max((value for value in (counts.pop('last_source'),counts.pop('last_identity')) if value),default=None)
+    return {**counts,'last_successful_collection':last,
+            'coverage':'Mumbai City and Mumbai Suburban listings; coverage is not exhaustive. Prices are published observations, not real-time restaurant quotes. Third-party listings may be dated and differ for delivery, portions or fees; source dates are shown where available.',
+            'attribution':'Menu listing facts when present: IndiaRestros and its named sources (public API terms). Place sources: Overture Maps contributors (CDLA Permissive 2.0, Apache 2.0, CC0); © OpenStreetMap contributors (ODbL). See data sources for notices.'}
 
 @app.post('/portal/restaurants/{rid}/sources')
 def add_source(rid:int,body:MenuSourceInput,user=Depends(owner),db=Depends(db_session)):
@@ -439,10 +449,13 @@ def unpriced_nearby(db,lat,lng,radius):
         if distance<=radius:output.append({'restaurant':public(restaurant),'distance_km':round(distance,2),'notice':'Menu price unavailable or stale. This is not a confirmed dish/budget match.'})
     return sorted(output,key=lambda row:row['distance_km'])[:20]
 
-def menu_details(db,item,*,evidence_by_id=None,restaurant_row=None):
+def menu_details(db,item,*,evidence_by_id=None,restaurant_row=None,source_metadata_by_id=None):
     evidence=evidence_by_id.get(item.id) if evidence_by_id is not None else db.get(MenuEvidence,item.id)
-    return {**public(item),'price_status':('fresh source observation' if evidence.active and evidence.expires_at>now() else 'stale or withdrawn source price') if evidence else 'sample' if (restaurant_row if restaurant_row is not None else db.get(Restaurant,item.restaurant_id)).sample else 'owner supplied; unverified',
-            'source_expires_at':evidence.expires_at if evidence else None}
+    if evidence:
+        from .menu_provenance import evidence_metadata
+        return {**public(item),**evidence_metadata(evidence,source_metadata_by_id)}
+    return {**public(item),'price_status':'sample' if (restaurant_row if restaurant_row is not None else db.get(Restaurant,item.restaurant_id)).sample else 'owner supplied; unverified','source_expires_at':None}
+
 
 
 @app.put('/portal/restaurants/{rid}/sources/{sid}')

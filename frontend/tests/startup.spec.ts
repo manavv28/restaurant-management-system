@@ -27,7 +27,7 @@ test('coverage refreshes after search and focus instead of keeping an old zero',
  let loads=0;let latest=91;
  await page.route('**/api/catalog/coverage',route=>route.fulfill({json:{real_restaurants:378,sample_restaurants:0,fresh_source_menu_items:loads++===0?0:latest,last_successful_collection:'2026-11-12T09:16:05+00:00',coverage:'Isolated coverage fixture',attribution:'Fixture only'}}));
  await page.goto('/');
- const priceCount=page.locator('aside.catalog-panel .catalog-numbers span').filter({hasText:'fresh source-backed menu prices'}).locator('b');
+ const priceCount=page.locator('aside.catalog-panel .catalog-numbers span').filter({hasText:'source-listed dish prices'}).locator('b');
  await expect(priceCount).toHaveText('91');
  latest=92;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
  await expect(priceCount).toHaveText('92');
