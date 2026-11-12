@@ -1,0 +1,4 @@
+# Offline operator tools only. Do not install in the Render web service.
+overturemaps==2.1.1
+pyarrow==26.0.1
+shapely==2.2.0

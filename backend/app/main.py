@@ -400,10 +400,11 @@ def catalog_coverage(db=Depends(db_session)):
     samples=db.scalar(select(func.count()).select_from(Restaurant).where(Restaurant.sample.is_(True))) or 0
     active=db.scalar(select(func.count()).select_from(MenuEvidence).where(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now())) or 0
     sources=db.scalar(select(func.count()).select_from(CatalogSource).where(CatalogSource.enabled.is_(True))) or 0
-    last=db.scalar(select(func.max(CatalogSource.checked_at)))
+    collection_times=[db.scalar(select(func.max(CatalogSource.checked_at))),db.scalar(select(func.max(CatalogIdentity.observed_at)))]
+    last=max((value for value in collection_times if value),default=None)
     return {'real_restaurants':real,'sample_restaurants':samples,'fresh_source_menu_items':active,'enabled_sources':sources,'last_successful_collection':last,
-            'coverage':'Partial Mumbai coverage only. Real records may have no menu or price. Community and owner data are not independently verified.',
-            'attribution':'OpenStreetMap data, when present: © OpenStreetMap contributors, ODbL'}
+            'coverage':'Mumbai City and Mumbai Suburban listings; coverage is not exhaustive. Includes restaurants, cafés, bakeries and other eateries. Records may be outdated or lack menus and prices; not independently verified.',
+            'attribution':'Sources when present: Overture Maps contributors (CDLA Permissive 2.0, Apache 2.0, CC0); © OpenStreetMap contributors (ODbL). See data sources for notices.'}
 
 @app.post('/portal/restaurants/{rid}/sources')
 def add_source(rid:int,body:MenuSourceInput,user=Depends(owner),db=Depends(db_session)):
@@ -467,3 +468,16 @@ def refresh_source(rid:int,sid:int,user=Depends(owner),db=Depends(db_session)):
     try:db.commit()
     except IntegrityError:db.rollback();raise HTTPException(409,'Refresh already queued; reload status')
     return {'job_id':job.id,'state':job.state}
+
+@app.get('/catalog/restaurants')
+def catalog_directory(q:str='',area:str='',after:int=0,limit:int=20,db=Depends(db_session)):
+    if len(q)>150 or limit<1 or limit>50 or after<0:
+        raise HTTPException(422,'Use a name up to 150 characters and a page size from 1 to 50')
+    if area and area not in AREAS: raise HTTPException(422,'Choose a supported Mumbai area')
+    statement=select(Restaurant).where(Restaurant.sample.is_(False),Restaurant.id>after)
+    if q.strip(): statement=statement.where(Restaurant.name.icontains(q.strip(),autoescape=True))
+    if area: statement=statement.where(Restaurant.area==area)
+    rows=db.scalars(statement.order_by(Restaurant.id).limit(limit+1)).all()
+    return {'restaurants':[public(r) for r in rows[:limit]],
+            'next_cursor':rows[limit-1].id if len(rows)>limit else None,
+            'notice':'Listings are source supplied and may be outdated. Menus and prices are shown only when separately available.'}
