@@ -39,6 +39,16 @@ PYTHONPATH=backend python -m app.menu_pilot \
 
 The CLI writes a review report only and does not modify the database. Native inspection runs serially for the Render Free memory budget. The existing supervised catalog worker performs publication only for the explicitly approved HTML source. No schema migration is needed for this feature.
 
-## Activation checkpoint
+## Live pilot and refresh limitation
 
-The pilot source and importer are prepared. Live Hakkasan source registration, successful worker execution and a public budget-search check must be recorded after deployment before reporting prices as available in production. Render Free and Supabase remain the target; no paid resource or owner onboarding is required for this pilot.
+Release `fd55f5415473` is deployed on the selected Vercel frontend and Render Free backend. The reviewed publisher source is registered as source 6 for restaurant 24. Its direct Render fetch returned HTTP 403 (provider job 31); that failure remains visible and was not reported as a successful automated refresh.
+
+A fresh public-source inspection through the managed workspace retrieved the same official menu normally, with robots checks and no access challenge bypass. Its 91 validated price observations were imported as a separate operator snapshot (job 32, audit 1), retaining the actual content hash, observed time and 48-hour expiry. The snapshot contains facts only; publisher descriptions and menu images are not republished. Both live API origins returned all 91 menu items and a real Chinese-under-₹1500 budget match, with a fresh-source label. The nine remaining restaurants were left unpriced.
+
+Automatic refresh from Render remains unverified because of the publisher's HTTP 403. The target refresh interval is 24 hours while the Free service is awake; the snapshot is not kept artificially fresh if collection fails. Its prices expire from matching after 48 hours without a successful refresh. Current snapshot timestamps/hash and both job IDs are recorded in the results JSON. This pilot does not establish automatic coverage for every restaurant or Google Maps photo ingestion.
+
+## Validation
+
+Initial local PostgreSQL suite: 72 passed. Hosted pilot CI run 43188463058 passed 71 tests with one native-PDF test skipped because the hosted runner lacks pdftotext; the native-PDF test passed locally. All 14 browser journeys, production frontend build, Docker build and non-root image smoke passed. Release integration run 43189179162 and live public-browser run 43189179394 passed. No database migration was required.
+
+Live-data checks exposed redundant queries per dish and an inaccurate owner-supplied search explanation for publisher prices. The follow-up batches evidence, chooses the best dish before loading restaurant offers/details, and labels published-menu observations correctly. A 90-dish regression check bounds search reads and restaurant-menu reads; the updated local PostgreSQL suite passes 73 tests.

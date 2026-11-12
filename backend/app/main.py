@@ -165,15 +165,21 @@ def search_database(body,intent,parser,user,db):
     preference=db.get(Preference,user.id) if user else None
     if preference and preference.preferred_cuisine and not intent.cuisine and not intent.dish:
         matches.sort(key=lambda row:preference.preferred_cuisine.lower() not in row[0].cuisine.lower())
-    results = []
-    for r,item,distance in matches:
-        offers = []
-        for c in db.scalars(select(Campaign).where(Campaign.restaurant_id==r.id)).all():
-            if user and eligibility(db,user,c)['eligible']: offers.append(public(c))
-        results.append({'restaurant':public(r),'dish':menu_details(db,item),'distance_km':round(distance,2),'offers':offers,
-            'reason':f"{item.name} is within your ₹{intent.max_budget} budget and {intent.radius_km:g} km radius. "+('Fictional sample listing.' if r.sample else 'Owner supplied menu; price not independently verified.')})
-    # One best matching dish per restaurant.
-    unique = list({row['restaurant']['id']:row for row in reversed(results)}.values())[::-1]
+    # Rank all eligible dishes, then load details once for each restaurant's best match.
+    best={}
+    for row in matches:best.setdefault(row[0].id,row)
+    evidence_by_id={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([row[1].id for row in best.values()])))} if best else {}
+    campaigns={}
+    if user and best:
+        for campaign in db.scalars(select(Campaign).where(Campaign.restaurant_id.in_(list(best)))):
+            campaigns.setdefault(campaign.restaurant_id,[]).append(campaign)
+    unique=[]
+    for r,item,distance in best.values():
+        offers=[public(c) for c in campaigns.get(r.id,[]) if eligibility(db,user,c)['eligible']]
+        dish=menu_details(db,item,evidence_by_id=evidence_by_id,restaurant_row=r)
+        note='Fictional sample listing.' if r.sample else 'Price observed on the published menu; confirm with the restaurant.' if item.id in evidence_by_id else 'Owner supplied menu; price not independently verified.'
+        unique.append({'restaurant':public(r),'dish':dish,'distance_km':round(distance,2),'offers':offers,
+                       'reason':f"{item.name} is within your ₹{intent.max_budget} budget and {intent.radius_km:g} km radius. "+note})
     trace += [{'agent':'Menu intelligence','tool':'database_price_and_dish_filter','output':{'matched_dishes':len(matches)}},
               {'agent':'Recommendation','tool':'distance_price_rank','output':{'restaurants':len(unique),'preferred_cuisine':preference.preferred_cuisine if preference else None}},
               {'agent':'Discount','tool':'campaign_eligibility','output':{'authenticated':bool(user)}}]
@@ -189,7 +195,9 @@ def search_database(body,intent,parser,user,db):
 @app.get('/restaurants/{rid}')
 def restaurant(rid:int,db=Depends(db_session)):
     r = restaurant_or_404(db,rid)
-    return {'restaurant':public(r),'menu':[menu_details(db,m) for m in db.scalars(select(MenuItem).where(MenuItem.restaurant_id==rid)).all()]}
+    menu=db.scalars(select(MenuItem).where(MenuItem.restaurant_id==rid)).all()
+    evidence={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([m.id for m in menu])))} if menu else {}
+    return {'restaurant':public(r),'menu':[menu_details(db,m,evidence_by_id=evidence,restaurant_row=r) for m in menu]}
 
 @app.post('/restaurants/{rid}/click')
 def click(rid:int,body:ClickInput|None=None,user=Depends(optional_user),db=Depends(db_session)):
@@ -430,9 +438,9 @@ def unpriced_nearby(db,lat,lng,radius):
         if distance<=radius:output.append({'restaurant':public(restaurant),'distance_km':round(distance,2),'notice':'Menu price unavailable or stale. This is not a confirmed dish/budget match.'})
     return sorted(output,key=lambda row:row['distance_km'])[:20]
 
-def menu_details(db,item):
-    evidence=db.get(MenuEvidence,item.id)
-    return {**public(item),'price_status':('fresh source observation' if evidence.active and evidence.expires_at>now() else 'stale or withdrawn source price') if evidence else 'sample' if db.get(Restaurant,item.restaurant_id).sample else 'owner supplied; unverified',
+def menu_details(db,item,*,evidence_by_id=None,restaurant_row=None):
+    evidence=evidence_by_id.get(item.id) if evidence_by_id is not None else db.get(MenuEvidence,item.id)
+    return {**public(item),'price_status':('fresh source observation' if evidence.active and evidence.expires_at>now() else 'stale or withdrawn source price') if evidence else 'sample' if (restaurant_row if restaurant_row is not None else db.get(Restaurant,item.restaurant_id)).sample else 'owner supplied; unverified',
             'source_expires_at':evidence.expires_at if evidence else None}
 
 

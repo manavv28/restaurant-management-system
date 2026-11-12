@@ -165,5 +165,18 @@
       "publishable_items": 0
     }
   ],
-  "notice": "Publisher observations, not guaranteed live restaurant prices. OCR/PDF candidates are never automatically published. Google Maps photos are not harvested."
+  "notice": "Publisher observations, not guaranteed live restaurant prices. OCR/PDF candidates are never automatically published. Google Maps photos are not harvested.",
+  "live_import": {
+    "restaurant_id": 24,
+    "source_id": 6,
+    "items": 91,
+    "snapshot_job_id": 32,
+    "provider_job_id": 31,
+    "fetched_at": "2026-11-12T09:16:05.299256+00:00",
+    "expires_at": "2026-11-14T09:16:05.299256+00:00",
+    "content_hash": "02da2d484259c83495f44b0335618c40cdcceb6f097f31654a9bcddcddb5c935",
+    "origin": "Operator public publisher HTTPS inspection; robots respected",
+    "automatic_refresh": "Blocked by publisher HTTP 403 from Render; unverified",
+    "release": "fd55f5415473"
+  }
 }
