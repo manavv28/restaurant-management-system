@@ -8,7 +8,7 @@ from .security import SECRET,db_session,current_user,optional_user,owner
 from .agents import AREAS,Intent,menu_search
 router=APIRouter(tags=['Insights'])
 
-def public(obj):return {c.name:getattr(obj,c.name) for c in obj.__table__.columns if c.name!='password_hash'}
+def public(obj):return {c.name:getattr(obj,c.name) for c in obj.__table__.columns if c.name not in ('password_hash','source_key')}
 
 def attribution(search):
     return jwt.encode({'aud':'biteai-click','search_id':search.id,'user_id':search.user_id or 0,'exp':datetime.now(timezone.utc)+timedelta(minutes=30)},SECRET,algorithm='HS256')
@@ -40,11 +40,14 @@ def insights(db=Depends(db_session)):
 def popular(include_samples:bool=True,db=Depends(db_session)):
     rows=db.execute(select(MenuItem,Restaurant,func.count(SearchMatch.id)).join(Restaurant,Restaurant.id==MenuItem.restaurant_id).join(SearchMatch,SearchMatch.menu_item_id==MenuItem.id).where(MenuItem.available.is_(True)).group_by(MenuItem.id,Restaurant.id).order_by(func.count(SearchMatch.id).desc(),MenuItem.id).limit(100)).all()
     output=[]
+    from .menu_provenance import source_metadata,evidence_metadata
+    evidence_by_id={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([row[0].id for row in rows])))} if rows else {}
+    metadata=source_metadata(db,evidence_by_id)
     for item,restaurant,count in rows:
-        evidence=db.get(MenuEvidence,item.id)
+        evidence=evidence_by_id.get(item.id)
         if restaurant.sample and not include_samples:continue
         if evidence and (not evidence.active or evidence.expires_at<=now()):continue
-        output.append({'dish':public(item),'restaurant':public(restaurant),'appearances':count})
+        output.append({'dish':{**public(item),**(evidence_metadata(evidence,metadata) if evidence else {'price_status':'sample' if restaurant.sample else 'owner supplied; unverified'})},'restaurant':public(restaurant),'appearances':count})
         if len(output)==6:break
     return output
 
@@ -54,11 +57,14 @@ def recommendations(area:str='Bandra',include_samples:bool=True,user=Depends(cur
     preference=db.get(Preference,user.id)
     cuisine=preference.preferred_cuisine if preference else None
     matches=menu_search(db,Intent(cuisine=cuisine or None,max_budget=100000,radius_km=10),*AREAS[area],include_samples)
+    from .menu_provenance import source_metadata,evidence_metadata
+    evidence_by_id={e.menu_item_id:e for e in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([row[1].id for row in matches])))} if matches else {}
+    metadata=source_metadata(db,evidence_by_id)
     seen=set();output=[]
     for restaurant,item,distance in matches:
         if restaurant.id in seen:continue
         seen.add(restaurant.id)
-        output.append({'restaurant':public(restaurant),'dish':public(item),'distance_km':round(distance,2),'reason':f'{cuisine} matches your saved cuisine preference.' if cuisine else 'Ranked by distance, price and available rating near your selected area.'})
+        output.append({'restaurant':public(restaurant),'dish':{**public(item),**(evidence_metadata(evidence_by_id[item.id],metadata) if item.id in evidence_by_id else {'price_status':'sample' if restaurant.sample else 'owner supplied; unverified'})},'distance_km':round(distance,2),'reason':f'{cuisine} matches your saved cuisine preference.' if cuisine else 'Ranked by distance, price and available rating near your selected area.'})
         if len(output)==6:break
     return output
 

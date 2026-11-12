@@ -58,6 +58,17 @@ async def run_one():
                 source=db.scalar(select(CatalogSource).where(CatalogSource.id==source.id).with_for_update().execution_options(populate_existing=True))
                 if not source.enabled:raise ValueError('Source disabled')
                 result=import_osm(db,payload,source.area)
+            elif source.kind=='indiarestros_api':
+                from .public_menu_api import fetch_snapshot,persist_snapshots,provider_id
+                from .database import CatalogIdentity,Restaurant
+                identity=db.get(CatalogIdentity,('indiarestros',provider_id(source.url)))
+                if not identity or identity.restaurant_id!=source.restaurant_id:raise ValueError('Reviewed provider identity required')
+                restaurant=db.get(Restaurant,source.restaurant_id)
+                if not restaurant or restaurant.owner_id is not None:
+                    source.enabled=False;db.commit();raise ValueError('Owner-managed public API source disabled')
+                snapshot=await fetch_snapshot(source,identity)
+                result=persist_snapshots(db,[snapshot])
+                trace.append({'agent':'Public menu API','tool':'attributed_INR_price_facts','output':result})
             elif source.kind=='approved_menu':
                 html=await fetch_menu(source);observed_url=source.url
                 trace.append({'agent':'Collection','tool':'approved_https_and_robots','bytes':len(html.encode())})
@@ -85,7 +96,7 @@ async def run_one():
             trace.append({'agent':'Data lake','tool':'source_deduplication_and_upsert','output':result})
             source.checked_at=now();job.state='succeeded';job.error=None;job.finished_at=now()
             job.trace=json.dumps(trace);db.commit()
-            return {'job_id':job.id,'state':job.state,'trace':trace}
+            return {'job_id':job.id,'state':job.state,'trace':trace,'source_kind':source.kind}
         except Exception as exc:
             jid=job_id
             db.rollback()
@@ -99,6 +110,8 @@ async def run_one():
                 try:delay=max(delay,float(exc.response.headers.get('Retry-After','3600'))/3600)
                 except ValueError:delay=max(delay,1)
             job.available_at=future(delay);job.trace=json.dumps(trace)
+            if source and source.kind=='indiarestros_api' and isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code==429:
+                db.execute(update(CatalogJob).where(CatalogJob.source_id.in_(select(CatalogSource.id).where(CatalogSource.kind=='indiarestros_api')),CatalogJob.state=='queued',CatalogJob.available_at<job.available_at).values(available_at=job.available_at))
             if job.state=='failed':job.finished_at=now()
             db.commit()
             return {'job_id':job.id,'state':job.state,'error':error}
@@ -121,7 +134,11 @@ def main():
         async def loop():
             while True:
                 with Session() as db:schedule(db)
-                print(json.dumps(await run_one()),flush=True)
+                # Bounded serial API batches refresh large menus without parallel fetches.
+                # Other providers and failures keep their previous one-job cadence.
+                for _ in range(5):
+                    result=await run_one();print(json.dumps(result),flush=True)
+                    if not result or result.get('source_kind')!='indiarestros_api' or result['state']!='succeeded':break
                 await asyncio.sleep(30)
         asyncio.run(loop())
     if args.once:

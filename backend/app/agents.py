@@ -2,7 +2,7 @@
 import json, math, os, re, logging
 import httpx
 from pydantic import BaseModel, Field
-from sqlalchemy import select,or_,and_
+from sqlalchemy import select,or_,and_,func
 from .database import Restaurant, MenuItem, MenuEvidence, now
 
 log = logging.getLogger('biteai.agents')
@@ -51,19 +51,29 @@ async def understand(query, budget, radius):
         return fallback, 'local rules (Gemini unavailable)'
 
 def menu_search(db, intent, lat, lng, include_samples=True):
-    output = []
+    """Filter in SQL, choose each venue's cheapest eligible dish, hydrate top 30 only."""
     from .geo import candidates
-    query=select(Restaurant,MenuItem).select_from(Restaurant).join(MenuItem,MenuItem.restaurant_id==Restaurant.id).outerjoin(MenuEvidence,MenuEvidence.menu_item_id==MenuItem.id).where(MenuItem.available.is_(True),MenuItem.price_paise<=intent.max_budget*100,or_(MenuEvidence.menu_item_id.is_(None),and_(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now())))
-    rows=db.execute(candidates(db,query,lat,lng,intent.radius_km)).all()
-    for restaurant, item in rows:
-        if restaurant.sample and not include_samples: continue
-        if intent.cuisine and intent.cuisine.lower() not in restaurant.cuisine.lower() + ' ' + item.cuisine.lower(): continue
-        if intent.dish and intent.dish.lower() not in item.name.lower(): continue
-        distance = distance_km(lat,lng,restaurant.latitude,restaurant.longitude)
-        if distance > intent.radius_km: continue
-        output.append((restaurant,item,distance))
-    output.sort(key=lambda r: (r[2]/intent.radius_km*.5 + r[1].price_paise/(intent.max_budget*100)*.35 + (1-(r[0].rating/5 if r[0].rating is not None else .5))*.15))
-    return output
+    query=select(Restaurant.id.label('restaurant_id'),Restaurant.latitude,Restaurant.longitude,Restaurant.rating,
+                 MenuItem.id.label('menu_item_id'),MenuItem.price_paise,
+                 func.row_number().over(partition_by=Restaurant.id,order_by=(MenuItem.price_paise,MenuItem.id)).label('choice'))
+    query=query.select_from(Restaurant).join(MenuItem,MenuItem.restaurant_id==Restaurant.id).outerjoin(MenuEvidence,MenuEvidence.menu_item_id==MenuItem.id).where(
+        MenuItem.available.is_(True),MenuItem.price_paise<=intent.max_budget*100,
+        or_(MenuEvidence.menu_item_id.is_(None),and_(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now())))
+    if not include_samples:query=query.where(Restaurant.sample.is_(False))
+    if intent.cuisine:query=query.where(or_(Restaurant.cuisine.icontains(intent.cuisine,autoescape=True),MenuItem.cuisine.icontains(intent.cuisine,autoescape=True)))
+    if intent.dish:query=query.where(MenuItem.name.icontains(intent.dish,autoescape=True))
+    eligible=candidates(db,query,lat,lng,intent.radius_km).subquery()
+    rows=db.execute(select(eligible).where(eligible.c.choice==1)).mappings().all()
+    ranked=[]
+    for row in rows:
+        distance=distance_km(lat,lng,row['latitude'],row['longitude'])
+        if distance>intent.radius_km:continue
+        score=distance/intent.radius_km*.5+row['price_paise']/(intent.max_budget*100)*.35+(1-(row['rating']/5 if row['rating'] is not None else .5))*.15
+        ranked.append((score,row['menu_item_id'],distance))
+    ranked.sort(key=lambda row:(row[0],row[1]));ranked=ranked[:30]
+    if not ranked:return []
+    details={item.id:(restaurant,item) for restaurant,item in db.execute(select(Restaurant,MenuItem).join(MenuItem,MenuItem.restaurant_id==Restaurant.id).where(MenuItem.id.in_([row[1] for row in ranked])))}
+    return [(details[mid][0],details[mid][1],distance) for _,mid,distance in ranked]
 
 async def discover_places(area):
     key = os.getenv('GOOGLE_PLACES_API_KEY')

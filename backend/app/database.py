@@ -1,6 +1,6 @@
 import os
 from datetime import datetime, timezone
-from sqlalchemy import create_engine, event, String, Float, Integer, Boolean, ForeignKey, Text, UniqueConstraint, text
+from sqlalchemy import Index, create_engine, event, String, Float, Integer, Boolean, ForeignKey, Text, UniqueConstraint, text
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 def now():
@@ -55,6 +55,7 @@ class Restaurant(Base):
     updated_at: Mapped[str] = mapped_column(String(40), default=now)
 class MenuItem(Base):
     __tablename__ = 'menu_items'
+    source_key: Mapped[str | None] = mapped_column(String(96), unique=True, nullable=True)
     id: Mapped[int] = mapped_column(primary_key=True)
     restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'), index=True)
     name: Mapped[str] = mapped_column(String(150), index=True)
@@ -153,6 +154,7 @@ class Preference(Base):
 
 class CatalogSource(Base):
     __tablename__ = 'catalog_sources'
+    __table_args__ = (Index('ux_catalog_sources_indiarestros_restaurant','restaurant_id',unique=True,postgresql_where=text("kind = 'indiarestros_api'"),sqlite_where=text("kind = 'indiarestros_api'")),)
     id: Mapped[int] = mapped_column(primary_key=True)
     kind: Mapped[str] = mapped_column(String(30))  # osm or approved_menu
     url: Mapped[str] = mapped_column(Text)
