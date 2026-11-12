@@ -1,0 +1,160 @@
+{
+  "release": "aa43bccd3d1d8da0cb1927e1364633eb0a2d9645",
+  "date": "2026-11-12",
+  "database": {
+    "real_listings": 10404,
+    "fictional_samples": 0,
+    "overture_aliases": 10155,
+    "new_overture_listings": 10026,
+    "search_areas": 48,
+    "menu_items": 91,
+    "active_menu_evidence": 91,
+    "hakkasan_menu_items": 91,
+    "preserved_hakkasan": "Hakkasan",
+    "owned_restaurants": 0,
+    "database_size": "39 MB"
+  },
+  "render": {
+    "service_id": "srv-dbo7mrjm8hqs73fpmcug",
+    "plan": "free",
+    "deployment_id": "dep-dbqt5gbm8hqs73d4ia90",
+    "state": "live"
+  },
+  "vercel": {
+    "project_id": "prj_7Y9jBQeV7u8dXVNFipUBOoN97Lu2",
+    "deployment_id": "dpl_hnsvuypj1kCZEp8aBPTpSXNhUasF",
+    "state": "READY",
+    "url": "https://restaurant-management-system-qxtx.vercel.app"
+  },
+  "migration": {
+    "name": "20261112112729_citywide_catalog_identities.sql",
+    "sha256": "f44cfd3bbb254f34bc92abd780c2c688f0fa6b5ee332820f0c231e19beb43ed7",
+    "rls_enabled": true,
+    "anon_access": false,
+    "authenticated_access": false
+  },
+  "import": {
+    "preflight_inserted": 250,
+    "batches": [
+      {
+        "batch": "000.sql",
+        "inserted_listings": 239,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "001.sql",
+        "inserted_listings": 475,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "002.sql",
+        "inserted_listings": 487,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "003.sql",
+        "inserted_listings": 484,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "004.sql",
+        "inserted_listings": 489,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "005.sql",
+        "inserted_listings": 496,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "006.sql",
+        "inserted_listings": 488,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "007.sql",
+        "inserted_listings": 497,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "008.sql",
+        "inserted_listings": 494,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "009.sql",
+        "inserted_listings": 498,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "010.sql",
+        "inserted_listings": 497,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "011.sql",
+        "inserted_listings": 497,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "012.sql",
+        "inserted_listings": 494,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "013.sql",
+        "inserted_listings": 497,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "014.sql",
+        "inserted_listings": 498,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "015.sql",
+        "inserted_listings": 497,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "016.sql",
+        "inserted_listings": 499,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "017.sql",
+        "inserted_listings": 497,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "018.sql",
+        "inserted_listings": 498,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "019.sql",
+        "inserted_listings": 500,
+        "linked_provider_records": 500
+      },
+      {
+        "batch": "020.sql",
+        "inserted_listings": 155,
+        "linked_provider_records": 155
+      }
+    ],
+    "preserved_hakkasan_id": 24,
+    "menu_prices_inferred": 0
+  },
+  "tests": {
+    "local_postgresql_passed": 77,
+    "hosted_postgresql_passed": 76,
+    "hosted_native_pdf_skip": 1,
+    "browser_tests_passed": 19,
+    "full_dataset_import_and_replay": true,
+    "production_directory_filter_pagination_modal_mobile": true,
+    "licence_files_served_both_origins": true,
+    "integration_run": 43241714809,
+    "public_browser_run": 43241714951
+  },
+  "limitations": "Source-backed listings, not a verified census. Existing OSM duplicates and provider spelling/category/coordinate errors may remain. Menu prices exist for one restaurant only."
+}

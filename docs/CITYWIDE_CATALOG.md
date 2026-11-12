@@ -32,3 +32,7 @@ After import verify restaurant/alias counts, foreign keys, duplicate source IDs,
 - Boundary geometry and existing OSM listings: © [OpenStreetMap contributors](https://www.openstreetmap.org/copyright), [ODbL 1.0](https://opendatacommons.org/licenses/odbl/1-0/). District relations [7964376](https://www.openstreetmap.org/relation/7964376) and [7964375](https://www.openstreetmap.org/relation/7964375), retrieved once through Nominatim. No Google search or Maps pages were scraped.
 
 Public attribution is also available on `/data-sources`.
+
+## Verified production result
+
+The live catalog has **10,404 listings across 48 search areas**, with 10,155 linked Overture identities and all 91 existing Hakkasan menu items preserved. Database size after import was 39 MB. [Production evidence](catalog/mumbai-2026-11-12-production.json) includes the release, deployments, migration checksum, batch results and test references. Both public origins serve the directory and full licence notices.
