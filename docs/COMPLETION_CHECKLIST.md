@@ -1,6 +1,6 @@
 # BiteAI requirements completion
 
-Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting target. The selected frontend is restaurant-management-system-qxtx.vercel.app.
+Updated 13 November 2026 (India). Render Free + Supabase PostgreSQL remain the hosting target. The selected frontend is restaurant-management-system-qxtx.vercel.app.
 
 ## Implemented and verified
 
@@ -11,7 +11,7 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 - [x] DNS TXT proof of restaurant website control; changing the website invalidates verification. This proves domain control, not legal merchant identity.
 - [x] Approved menu-link discovery, structured menu extraction, evidence-checked Gemini adapter, category classification, price-change audits and source controls.
 - [x] Citywide public-source catalog: **10,404 source-backed listings across 48 Mumbai search areas**, including 10,026 added Overture records and the existing 378 OSM records. Provenance aliases, licences, district clipping, conservative duplicate matching and unknown-price labels are retained. This is not an exhaustive or independently verified census. See [CITYWIDE_CATALOG.md](CITYWIDE_CATALOG.md).
-- [x] Honest handling of unknown menus/prices. None were inferred from OSM. Current pilot coverage is 91 source-observed dishes for one restaurant; other listings may remain unpriced. See [MENU_PILOT.md](MENU_PILOT.md).
+- [x] Honest handling of unknown menus/prices. None were inferred from OSM. **357,694 listed dish prices across 2,613 restaurants** are published. Public menu API coverage is documented in [PUBLIC_MENU_PRICES.md](PUBLIC_MENU_PRICES.md); third-party prices retain original dates and ordering context. Existing publisher and owner menus are protected. Coverage remains incomplete; unknown prices are never invented.
 - [x] Price/distance/rating ranking and saved-cuisine recommendations.
 - [x] Missing-match follow-up and optional Google Places fallback that labels discoveries as unpriced and does not persist provider content indefinitely.
 - [x] Popular-dish and recommendation panels; cards support source/freshness, photos/attribution, ratings/review counts, contacts, directions, external menu/ordering links and eligible offers.
@@ -21,11 +21,11 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 - [x] Campaign reservation/discount/order-value reporting; reservations are never reported as sales.
 - [x] Signed refund/dispute events adjust eligibility; refund replay and delayed dispute events are tested. Browser callbacks cannot credit spending.
 - [x] PostGIS enabled in the unexposed extensions schema, geography GiST index, and indexed proximity prefilter with deterministic final distance checks. Portable SQL bounding-box fallback remains available.
-- [x] Additive migrations applied to live Supabase. Hosted columns, constraints, indexes and browser-role access matched the isolated tested schema. Seven SQL checksums were recorded after verification; future releases use the checksum runner. Do not blindly replay baseline SQL or use CLI db push against this manually initialized project.
+- [x] Additive migrations applied to live Supabase. Hosted columns, constraints, indexes and browser-role access matched the isolated tested schema. Nine SQL checksums were recorded after verification; future releases use the checksum runner. Do not blindly replay baseline SQL or use CLI db push against this manually initialized project.
 - [x] Retention worker runs every six hours while Render is awake; structured request IDs and sanitized server-error logs support diagnosis. No always-on worker is promised.
 - [x] Isolated pg_dump/pg_restore rehearsal: 378 records, matching complete-row hash.
 - [x] Legacy Render database inspected read-only: zero users/favourites/transactions; six sample restaurants and sample campaigns. Nothing was deleted or automatically transferred.
-- [x] Backend PostgreSQL suite: **58 passed**. SQLite: **53 passed, 5 PostgreSQL-only skips**; ten browser journeys cover core flows, cookie revocation, location permission/denial, voice adapter/fallback and checkout-status behavior.
+- [x] Backend PostgreSQL suite: **87 passed locally; 86 passed and one native-PDF-only skip in hosted CI**. All **24 browser checks** pass, including source dates, fractional rupees, menu links, startup recovery and core account flows.
 - [x] Production frontend build/TypeScript checks passed.
 - [x] CI runs PostgreSQL/schema/transfer tests, browser journeys, the actual production Docker build and image smoke checks on a hosted builder.
 
@@ -40,11 +40,11 @@ Updated 11 November 2026. Render Free + Supabase PostgreSQL remain the hosting t
 
 See [REQUIRED_CONFIGURATION.md](REQUIRED_CONFIGURATION.md) for the exact inputs, secure environment-variable placement, and follow-up validation.
 
-- [ ] Approve restaurant website domains, collect real menus/prices, and verify the complete real dish/budget-match journey. The 10-listing Bandra pilot added 91 source-observed Hakkasan dishes and verified a real budget match. Broader coverage remains incomplete; automatic Render refresh is blocked by publisher HTTP 403. Prices cannot be fabricated or collected from unapproved hosts.
+- [ ] Expand coverage where usable menus remain unavailable and confirm current restaurant prices. The public API import and actual Render refresh are verified; the original Hakkasan publisher still returns HTTP 403 to Render. Published third-party prices are reference observations, not live restaurant quotes.
 - [ ] Configure Gemini and Google Places keys and validate real provider responses/quotas. Optional Google Maps rendering requires a referrer-restricted browser key. Deterministic text search and Leaflet work without these keys.
-- [ ] Configure TLS SMTP, sender identity and PUBLIC_APP_URL; verify actual email delivery and a real verification/reset email. No email was sent to a real user during tests.
+- [ ] Confirm inbox placement and completion of the real verification/reset link. The configured HTTPS security-mail relay delivered a Gmail-accepted message for letsbiteai@gmail.com; see [EMAIL_DELIVERY.md](EMAIL_DELIVERY.md).
 - [ ] Complete legal merchant onboarding/settlement/routing and validate Razorpay sandbox captures/refunds/disputes end to end before enabling charges. Signed fixtures validate application behavior; they are not provider certification.
-- [ ] Select/configure an alert destination and confirm a real incident notification. Request logs, health checks and CI failure status are available, but no external alert recipient was invented.
+- [ ] Confirm a real incident notification to the selected letsbiteai@gmail.com address. Request logs, health checks and CI failure status are available.
 - [ ] Confirm production backup availability/retention and rehearse recovery using a protected production backup. The completed restore rehearsal uses isolated public catalog data.
 
 The original MVP explicitly permits simulated payments and provider fallbacks. Those fallbacks do not establish real menu coverage, working email delivery, legal merchant approval or full production readiness.
@@ -109,3 +109,7 @@ The final integration audit separated the 48 search areas from the original five
 ## Search connection recovery follow-up, 12 November 2026
 
 Release `086e67bbd4718aa377fd0e7d527821aa630b8031` is live on both selected origins. A failed readiness check now shows an inline retry state rather than false zero matches; a healthy catalog can establish readiness if the health probe fails. Health responses are dynamic, bounded and explicitly non-cacheable, and account refresh no longer holds the search spinner after results arrive. Full CI and public browser verification passed, including forced readiness timeout, fallback and single-POST retry checks. See [STARTUP_RECOVERY.md](STARTUP_RECOVERY.md) for evidence and limits. The original intermittent end-user transport failure was not reproduced, and no specific cause is claimed as confirmed.
+
+## Public menu price release, 13 November 2026 (India)
+
+Release `abae206e042a` is deployed on the selected Vercel frontend and Render Free backend. Supabase migration nine is applied with its checksum; RLS remains enabled. [Hosted integration](https://github.com/manavv28/restaurant-management-system/actions/runs/43286798643) and [public browser verification](https://github.com/manavv28/restaurant-management-system/actions/runs/43286798536) passed. A real supervised API refresh succeeded (job 76, source 484) on its first attempt. Bounded SQL ranking, idempotent batches, source attribution and original publisher preservation were tested against more than 300,000 prices. The final collection and publication totals are recorded in [the price report](catalog/menu-prices-2026-11-13.json).

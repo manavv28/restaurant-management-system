@@ -1,0 +1,241 @@
+{
+  "verified_at": "2026-11-13T01:19:34.742963+05:30",
+  "release": "abae206e042acb541de5c83ed9f8a82520a6b9c2",
+  "frontend": "https://restaurant-management-system-qxtx.vercel.app",
+  "backend": "https://biteai-demo.onrender.com",
+  "backend_plan": "Render Free",
+  "database": "Supabase PostgreSQL",
+  "source": "IndiaRestros documented public API",
+  "terms": "https://indiarestros.com/terms",
+  "api_docs": "https://indiarestros.com/api/docs",
+  "source_scan": {
+    "offset": 54400,
+    "pages": 1089,
+    "counts": {
+      "listed_records": 54422,
+      "unmatched_identity": 38416,
+      "matched": 10049,
+      "outside_boundary_or_missing_point": 5952,
+      "ambiguous_nearby_branches": 5,
+      "menus_downloaded": 2795,
+      "menu_items_received": 387510
+    },
+    "completed": true,
+    "checked_at": "2026-11-12T19:36:33.330926+00:00"
+  },
+  "validated_menu_snapshots": 2614,
+  "unique_snapshot_rejections": {
+    "Original menu names a different brand; review required": 85,
+    "Original menu names a different area; review required": 74,
+    "No unambiguous positive INR price facts": 22
+  },
+  "published_api_venues": 2612,
+  "added_api_prices": 357603,
+  "preserved_publisher_prices": 91,
+  "total_source_listed_prices": 357694,
+  "restaurants_with_source_listed_prices": 2613,
+  "real_restaurant_listings": 10404,
+  "fictional_samples": 0,
+  "original_source_dates": {
+    "earliest": "2026-10-09T14:17:55+00:00",
+    "latest": "2026-10-18T14:26:40+00:00"
+  },
+  "original_providers": {
+    "zomato": 2574,
+    "website": 38
+  },
+  "publication_plans": [
+    {
+      "stage": "publish-stage1",
+      "plan_sha256": "2c1c574a311611a8e6f2aea85fd778101dc881e6ff589cd005f9fe1fe3e2cd98",
+      "venues": 2393,
+      "prices": 324468,
+      "rehearsal": {
+        "totals": {
+          "eligible_restaurants": 2393,
+          "menu_sources": 2393,
+          "saved_items": 324468,
+          "evidence_items": 324468,
+          "withdrawn_items": 0,
+          "audit_rows": 2393
+        },
+        "menu_rows": 324469,
+        "evidence_rows": 324469,
+        "database_bytes": 370243251,
+        "seconds": 123.99,
+        "batch_replay_preserved_counts": true,
+        "publisher_menu_preserved": true
+      }
+    },
+    {
+      "stage": "publish-stage2",
+      "plan_sha256": "14364effa5510a0997007c8f55b68a7d55a23f366423e978770cfcf3999c535f",
+      "venues": 219,
+      "prices": 33135,
+      "rehearsal": {
+        "totals": {
+          "eligible_restaurants": 219,
+          "menu_sources": 219,
+          "saved_items": 33135,
+          "evidence_items": 33135,
+          "withdrawn_items": 0,
+          "audit_rows": 219
+        },
+        "menu_rows": 357604,
+        "evidence_rows": 357604,
+        "database_bytes": 278910643,
+        "seconds": 5.89,
+        "batch_replay_preserved_counts": true,
+        "publisher_menu_preserved": true
+      }
+    }
+  ],
+  "checks": {
+    "backend_local_passed": 87,
+    "backend_hosted_passed": 86,
+    "backend_hosted_native_pdf_skip": 1,
+    "browser_checks_passed": 24,
+    "release_integration": "https://github.com/manavv28/restaurant-management-system/actions/runs/43286798643",
+    "release_browser": "https://github.com/manavv28/restaurant-management-system/actions/runs/43286798536",
+    "actual_render_refresh_job": 76,
+    "actual_render_refresh_state": "succeeded",
+    "actual_render_refresh_attempts": 1,
+    "public_price_browser": {
+      "status": "passed",
+      "resultCount": 30,
+      "referenceVenue": "PJ's",
+      "pricePaise": 10500,
+      "originalDate": "2026-10-17T12:56:28+00:00",
+      "sourceLink": true,
+      "mobileOverflow": false,
+      "pageErrors": []
+    },
+    "public_search_recovery": {
+      "healthyCatalogFallback": true,
+      "timeoutHasRetry": true,
+      "noFalseZeroMatches": true,
+      "explicitRetrySearchPosts": 1,
+      "healthCache": "no-store, max-age=0"
+    },
+    "public_directory": {
+      "status": "passed",
+      "listings": 10404,
+      "searchAreas": 48,
+      "directoryArea": "Borivali",
+      "pagination": true,
+      "sourceModal": true,
+      "directoryClickRecorded": true,
+      "mobileOverflow": false,
+      "notices": true,
+      "pageErrors": []
+    },
+    "final_public_browser": {
+      "status": "passed",
+      "totalPrices": 357694,
+      "pricedVenues": 2613,
+      "additionalVenueId": 6048,
+      "additionalVenuePrices": 30,
+      "resultCount": 30,
+      "referenceVenue": "PJ's",
+      "pricePaise": 10500,
+      "originalDate": "2026-10-17T12:56:28+00:00",
+      "sourceLink": true,
+      "mobileOverflow": false,
+      "pageErrors": [],
+      "interceptedFailures": []
+    },
+    "final_public_api": {
+      "searches": [
+        {
+          "area": "Bandra",
+          "query": "hakka noodles under 300",
+          "results": 30,
+          "seconds": 18.702,
+          "reference_results": 30
+        },
+        {
+          "area": "Andheri",
+          "query": "dosa under 200",
+          "results": 30,
+          "seconds": 15.633,
+          "reference_results": 30
+        },
+        {
+          "area": "Powai",
+          "query": "biryani under 300",
+          "results": 30,
+          "seconds": 4.301,
+          "reference_results": 30
+        },
+        {
+          "area": "Chembur",
+          "query": "pizza under 500",
+          "results": 30,
+          "seconds": 3.597,
+          "reference_results": 30
+        },
+        {
+          "area": "Borivali",
+          "query": "dosa under 300",
+          "results": 0,
+          "seconds": 4.16,
+          "reference_results": 0
+        }
+      ],
+      "publisher_menu_preserved": 91,
+      "health": {
+        "release": "abae206e042a",
+        "database_provider": "Supabase",
+        "database_tls": "verify-full",
+        "retention_worker": true,
+        "status": "ok",
+        "database": "connected",
+        "parser": "local rules",
+        "google_places": false,
+        "payments": "provider unavailable",
+        "payment_simulation": false
+      }
+    },
+    "browser_transport_note": "The managed browser uses a TLS-validating Node request bridge because Chromium lacks the managed proxy CA. Two preliminary bridge requests timed out; the final full-data browser pass had no network/page failures. No certificate checks were disabled."
+  },
+  "security_advisors": {
+    "warnings": 0,
+    "errors": 0,
+    "expected_private_table_rls_no_policy_info": 23
+  },
+  "limitations": [
+    "Coverage is partial; some venues lack usable priced menus.",
+    "Third-party reference prices retain original source dates and ordering context; confirm current prices, taxes and fees with the restaurant.",
+    "API evidence expires after 48 hours or 90 days from the original observation, whichever comes first.",
+    "Render Free workers run while the service is awake; no always-on refresh guarantee.",
+    "Only price facts and source metadata are imported; no publisher photographs, reviews or descriptions.",
+    "Merchant activation and encrypted production backup/recovery remain external prerequisites.",
+    "Final public API search checks ranged from 3.6 to 18.7 seconds; Free hosting and concurrent database work can produce variable latency."
+  ],
+  "production_verification": {
+    "api_prices": 357603,
+    "api_sources": 2612,
+    "total_prices": 357694,
+    "priced_venues": 2613,
+    "database_bytes": 286365363,
+    "worker_refresh": {
+      "id": 76,
+      "error": null,
+      "state": "succeeded",
+      "attempts": 1
+    },
+    "real_restaurants": 10404,
+    "sample_restaurants": 0,
+    "enabled_osm_sources": 5,
+    "active_source_prices": 357694,
+    "disabled_osm_sources": 43,
+    "publisher_prices_preserved": 91,
+    "api_prices_missing_evidence": 0
+  },
+  "preservation_policy": "One reviewed API feed per venue. Previously published feeds are retained during staged collection; alternative provider records are not averaged or silently substituted.",
+  "publication_journals": {
+    "stage1_batches": 124,
+    "stage2_batches": 12,
+    "local_artifacts": "work/menu-expansion/production-stage1-journal.json and production-stage2-journal.json; raw facts and plans remain local and in database provenance, not in Git."
+  }
+}
