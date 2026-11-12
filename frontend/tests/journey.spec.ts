@@ -38,6 +38,9 @@ test('mobile layout and map interaction',async({page})=>{
  await expect(page.getByLabel('Interactive restaurant map')).toBeVisible();
  await expect(page.locator('.leaflet-interactive').first()).toBeVisible();
  await page.locator('.leaflet-interactive').last().click();
+ await expect(page.locator('.leaflet-popup-content button')).toBeVisible();
+ await page.getByRole('textbox',{name:'Your food craving'}).fill('Chinese');
+ await expect(page.locator('.leaflet-popup-content button')).toBeVisible();
  await page.locator('.leaflet-popup-content button').click();
  await expect(page.getByRole('dialog')).toBeVisible();
 });
