@@ -31,3 +31,13 @@
 | Voice | Verify actual microphone transcription on a supported device | User microphone/browser permission and speech service. Browser voice adapter/fallback tests pass |
 
 Full app access authorizes implementation; it does not supply third-party credentials, a user's OAuth consent, a merchant identity, mailbox visibility or unknown restaurant facts. These dependencies must not be marked complete based on simulated responses. Keep Render Free and Supabase; no paid resource was provisioned.
+
+## Published release
+
+- PR #17 merged; application commit `082b9205c95984ddfdb2615470ae8ad6cf27893e`.
+- Vercel production `dpl_BXZ8kPdA1je7SmVbbCwRYRZwxsP3`: READY on the selected public alias.
+- Render `dep-dbr3dcifngtc73a2q0bg`: LIVE, Free plan, Supabase verify-full TLS.
+- Hosted integration runs 43314921253, 43314951124 and final 43315503798 succeeded: 99 backend tests, one PDF-only skip, 29 browser journeys, production builds and migrated Docker smoke.
+- Public run 43315503732 succeeded, including the original food-discovery constraint check. Additional public mobile/desktop browser verification reported no page errors, intercepted failures or horizontal overflow. Correct public contact attribution and telephone links were retained.
+- Post-live application ERROR/Traceback scan from 22:00:36 UTC on 12 November returned zero matches. This is a bounded observation, not continuous monitoring.
+- Final provider-connection query returned no accounts. Model/payment prerequisites are unchanged.

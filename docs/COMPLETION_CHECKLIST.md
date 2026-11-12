@@ -117,3 +117,7 @@ Release `abae206e042a` is deployed on the selected Vercel frontend and Render Fr
 ## Official platforms and contacts, 13 November 2026 (India)
 
 Release `3678a24e8044` adds official provider account links, protected credential tables, read-only Swiggy tools and Zomato authenticated-contract capture. Actual provider login and live reads still require user account consent. Both provider registrations accepted callback requests; this is not a claim of working authenticated price comparison. Hosted CI passed 99 backend tests plus one PDF skip and all 28 browser checks. Forty-seven public contacts were published with per-number evidence; 8,747 listings now have phone numbers. See [USER_BRIEF_CHECKLIST.md](USER_BRIEF_CHECKLIST.md) for the checklist against the exact original MVP brief and [the rollout evidence](catalog/provider-contacts-2026-11-13.json).
+
+## Presentation release, 13 November 2026 (India)
+
+Release `082b9205c959` is live on Vercel and Render Free. Consistent controls, provider status badges, accessible accordions and improved mobile presentation are complete. Hosted validation passed 99 backend tests plus one PDF skip and 29 browser journeys; both public release checks passed. See [IMPLEMENTATION_VERIFICATION.md](IMPLEMENTATION_VERIFICATION.md) for release evidence and the exact remaining original-brief dependencies. No blanket production-readiness claim is made.

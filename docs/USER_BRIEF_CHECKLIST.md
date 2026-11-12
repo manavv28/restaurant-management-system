@@ -1,6 +1,6 @@
 # Remaining work against the user's original BiteAI brief
 
-Verified 13 November 2026 (India), application release `3678a24e8044`. This checklist separates working software from actual coverage and live-provider evidence. It does not certify full production readiness.
+Verified 13 November 2026 (India), application release `082b9205c959`. This checklist separates working software from actual coverage and live-provider evidence. It does not certify full production readiness.
 
 ## Voice/text food discovery
 
@@ -49,3 +49,11 @@ Verified 13 November 2026 (India), application release `3678a24e8044`. This chec
 - [ ] Provider-account response storage/analytics beyond the immediate user task needs the applicable rights and consent. MCP responses are currently kept out of the public catalogue and analytics.
 
 Operational follow-ups such as encrypted production recovery and incident-alert delivery are separate launch safeguards in [STATUS.md](STATUS.md). Details and evidence: [PLATFORM_CONNECTIONS.md](PLATFORM_CONNECTIONS.md), [PUBLIC_CONTACTS.md](PUBLIC_CONTACTS.md) and [the release report](catalog/provider-contacts-2026-11-13.json).
+
+## Presentation and release verification
+
+- [x] Consistent styled controls, clear provider connection badges, responsive directory results, readable mobile cards, visible keyboard focus and request/disabled states.
+- [x] Latest hosted validation: 99 backend tests plus one PDF skip, 29 browser journeys, production builds, migrated database smoke and two public-release checks.
+- [x] Original Haka-noodles/₹300/2 km request verified against the public catalogue, with source attribution and explicit reference-price limits.
+
+These completions do not change the open data/integration requirements above. See [IMPLEMENTATION_VERIFICATION.md](IMPLEMENTATION_VERIFICATION.md).
