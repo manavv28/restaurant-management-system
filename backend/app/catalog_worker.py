@@ -38,7 +38,7 @@ async def run_one():
             if claimed.rowcount:job=db.get(CatalogJob,candidate.id);break
         if not job:return None
         source=db.get(CatalogSource,job.source_id)
-        trace=[]
+        trace=[];job_id=job.id
         try:
             if not source or not source.enabled:raise ValueError('Source disabled')
             if source.kind=='osm':
@@ -76,7 +76,7 @@ async def run_one():
             job.trace=json.dumps(trace);db.commit()
             return {'job_id':job.id,'state':job.state,'trace':trace}
         except Exception as exc:
-            jid=job.id
+            jid=job_id
             db.rollback()
             job=db.get(CatalogJob,jid)
             if isinstance(exc,httpx.HTTPStatusError):error=f'Provider returned HTTP {exc.response.status_code}'

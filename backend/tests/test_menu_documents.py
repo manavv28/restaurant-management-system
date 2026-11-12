@@ -17,10 +17,11 @@ def section(cards,currency='Pricing is in Indian Rupees (INR).',title='A La Cart
 def test_explicit_publisher_prices_exclude_wine_foreign_currency_ranges_and_conflicts():
     good=section(card())
     assert publisher_html_menu(good)[0]['price_paise']==25000
-    assert structured_menu(good)[0][0]['method'].startswith('publisher HTML')
+    assert structured_menu(good)[0][0]['method'].startswith('publisher-html')
     assert publisher_html_menu(section(card(),title='Wine'))==[]
     assert publisher_html_menu(section(card(),currency='Prices are in USD'))==[]
     assert publisher_html_menu(section(card(price='250 / 350')))==[]
+    assert publisher_html_menu(section(card(price='1,45')))==[]
     assert publisher_html_menu(section(card()+card(price='₹350')))==[]
     assert publisher_html_menu(section(card(price='1,450')))[0]['price_paise']==145000
     assert publisher_html_menu('<p>Fixture noodles near table 250</p>')==[]
@@ -96,5 +97,27 @@ def test_publisher_menu_worker_imports_evidence_and_price_audit(client,monkeypat
         item=db.scalar(select(MenuItem).where(MenuItem.name=='Fixture noodles'))
         evidence=db.get(MenuEvidence,item.id)
         assert item.price_paise==25000 and evidence.active
-        assert evidence.method=='publisher HTML / explicit INR price / dine-in'
+        assert evidence.method=='publisher-html/INR/dine-in'
         assert evidence.source_id==sid and evidence.expires_at>evidence.fetched_at
+
+
+def test_worker_recovers_a_failed_database_flush(client,monkeypatch):
+    import app.catalog_worker as worker
+    from sqlalchemy import select
+    from app.database import Session,MenuItem,CatalogJob
+    from test_catalog import source
+    with Session() as db:
+        item_source=source(db);sid=item_source.id
+        db.add(CatalogJob(source_id=sid));db.commit()
+    async def page(_):return section(card())
+    def invalid_insert(db,item_source,*args,**kwargs):
+        db.add(MenuItem(restaurant_id=item_source.restaurant_id,name='Invalid fixture',cuisine='Fixture',price_paise=-1))
+        db.flush()
+    monkeypatch.setattr(worker,'fetch_menu',page)
+    monkeypatch.setattr(worker,'persist_menu',invalid_insert)
+    result=asyncio.run(worker.run_one())
+    assert result['state']=='queued'
+    with Session() as db:
+        job=db.get(CatalogJob,result['job_id'])
+        assert job.attempts==1 and 'IntegrityError' in job.error
+        assert not db.scalar(select(MenuItem).where(MenuItem.name=='Invalid fixture'))

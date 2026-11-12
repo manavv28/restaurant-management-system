@@ -33,12 +33,12 @@ def publisher_html_menu(html):
             name=' '.join(names[0].get_text(' ',strip=True).split())
             price=prices[0].get_text(' ',strip=True)
             if not name or len(name)>150:continue
-            if not re.fullmatch(r'(?:₹|INR|Rs\.?)?\s*(?:\d{1,3}(?:,\d{2,3})+|\d+)(?:\.\d{1,2})?',price,re.I):continue
+            if not re.fullmatch(r'(?:₹|INR|Rs\.?)?\s*(?:\d+|\d{1,3}(?:,\d{3})+|\d{1,2}(?:,\d{2})*,\d{3})(?:\.\d{1,2})?',price,re.I):continue
             value=re.sub(r'^(?:₹|INR|Rs\.?)\s*','',price,flags=re.I).replace(',','').strip()
             try:amount=paise(value)
             except ValueError:continue
             items.append({'name':name,'price_paise':amount,'excerpt':name+' | '+price+' | INR dine-in',
-                          'method':'publisher HTML / explicit INR price / dine-in'})
+                          'method':'publisher-html/INR/dine-in'})
     grouped={}
     for item in items:grouped.setdefault(item['name'].casefold(),[]).append(item)
     return [rows[0] for rows in grouped.values() if len({row['price_paise'] for row in rows})==1]
