@@ -32,10 +32,21 @@ export async function ensureSearchReady(onWaiting:()=>void){
     const health=await apiRequest<{status:string}>('/health',{},Math.min(12000,deadline-Date.now()));
     if(health.status==='ok'){readyUntil=Date.now()+10000;return}
    }catch(error){if(error instanceof ApiError&&error.status>=400&&error.status<500)throw error}
+   // A successful catalog read also proves that the API and database are reachable.
+   // Do not block a usable search solely on an unavailable health probe.
+   const remaining=deadline-Date.now();
+   if(remaining>0){
+    try{
+     const coverage=await apiRequest<{real_restaurants:number;fresh_source_menu_items:number}>('/catalog/coverage',{},Math.min(5000,remaining));
+     if(Number.isInteger(coverage.real_restaurants)&&coverage.real_restaurants>=0&&typeof coverage.fresh_source_menu_items==='number'){
+      readyUntil=Date.now()+10000;return;
+     }
+    }catch(error){if(error instanceof ApiError&&error.status>=400&&error.status<500)throw error}
+   }
    onWaiting();
    await new Promise(resolve=>setTimeout(resolve,Math.min(1500,Math.max(0,deadline-Date.now()))));
   }
-  throw new ApiError('The search service could not start yet. Please try again in a moment.',503);
+  throw new ApiError('Could not reach the search service. Check your connection and retry.',503);
  })();
  try{await waking}finally{waking=null}
 }
