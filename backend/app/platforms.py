@@ -280,7 +280,9 @@ def live_menu(body:MenuRequest,response:Response,user=Depends(current_user),db=D
         selection=jwt.decode(body.selection,SECRET,algorithms=['HS256'],audience='biteai-swiggy-selection',options={'require':['exp','sub','rid','latitude','longitude','budget']})
         if selection['sub']!=str(user.id):raise ValueError()
     except (jwt.PyJWTError,ValueError):raise HTTPException(400,'Select a Swiggy restaurant again') from None
-    data=call(db,user.id,'search_menu',{'query':body.query,'restaurantIdOfAddedItem':selection['rid'],'latitude':selection['latitude'],'longitude':selection['longitude']})
+    intent=parse_local(body.query)
+    menu_query=intent.dish or intent.cuisine or body.query.strip()
+    data=call(db,user.id,'search_menu',{'query':menu_query,'restaurantIdOfAddedItem':selection['rid'],'latitude':selection['latitude'],'longitude':selection['longitude']})
     items=[];unit=os.getenv('SWIGGY_MCP_PRICE_UNIT','unknown')
     rows=data.get('items',[])
     if not isinstance(rows,list):raise HTTPException(502,'Swiggy returned invalid menu data')
