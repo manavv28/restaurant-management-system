@@ -2,7 +2,7 @@
 import json, math, os, re, logging
 import httpx
 from pydantic import BaseModel, Field
-from sqlalchemy import select
+from sqlalchemy import select,or_,and_
 from .database import Restaurant, MenuItem, MenuEvidence, now
 
 log = logging.getLogger('biteai.agents')
@@ -53,12 +53,10 @@ async def understand(query, budget, radius):
 def menu_search(db, intent, lat, lng, include_samples=True):
     output = []
     from .geo import candidates
-    query=select(Restaurant, MenuItem).join(MenuItem).where(MenuItem.available.is_(True), MenuItem.price_paise <= intent.max_budget*100)
+    query=select(Restaurant,MenuItem).select_from(Restaurant).join(MenuItem,MenuItem.restaurant_id==Restaurant.id).outerjoin(MenuEvidence,MenuEvidence.menu_item_id==MenuItem.id).where(MenuItem.available.is_(True),MenuItem.price_paise<=intent.max_budget*100,or_(MenuEvidence.menu_item_id.is_(None),and_(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now())))
     rows=db.execute(candidates(db,query,lat,lng,intent.radius_km)).all()
     for restaurant, item in rows:
         if restaurant.sample and not include_samples: continue
-        evidence=db.get(MenuEvidence,item.id)
-        if evidence and (not evidence.active or evidence.expires_at<=now()):continue
         if intent.cuisine and intent.cuisine.lower() not in restaurant.cuisine.lower() + ' ' + item.cuisine.lower(): continue
         if intent.dish and intent.dish.lower() not in item.name.lower(): continue
         distance = distance_km(lat,lng,restaurant.latitude,restaurant.longitude)

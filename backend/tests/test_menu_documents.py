@@ -121,3 +121,30 @@ def test_worker_recovers_a_failed_database_flush(client,monkeypatch):
         job=db.get(CatalogJob,result['job_id'])
         assert job.attempts==1 and 'IntegrityError' in job.error
         assert not db.scalar(select(MenuItem).where(MenuItem.name=='Invalid fixture'))
+
+
+def test_many_published_prices_keep_queries_bounded_and_source_label_correct(client):
+    from sqlalchemy import event
+    from app.database import Session,MenuItem,MenuEvidence,engine
+    from app.catalog import persist_menu
+    from test_catalog import source
+    with Session() as db:
+        item_source=source(db);rid=item_source.restaurant_id
+        items=[{'name':f'Fixture noodle {i}','price_paise':10000+i,'excerpt':f'Fixture noodle {i} INR 100','method':'publisher-html/INR/dine-in'} for i in range(90)]
+        persist_menu(db,item_source,'Explicit isolated fixture',items);db.commit()
+    queries=[]
+    def record(connection,cursor,statement,*args):
+        if statement.lstrip().upper().startswith('SELECT'):queries.append(statement)
+    event.listen(engine,'before_cursor_execute',record)
+    try:
+        response=client.post('/search',json={'query':'Chinese under 500','area':'Bandra','include_samples':False})
+        assert response.status_code==200
+        matches=[r for r in response.json()['results'] if r['restaurant']['id']==rid]
+        assert len(matches)==1 and matches[0]['dish']['price_paise']==10000
+        assert 'published menu' in matches[0]['reason'] and 'Owner supplied' not in matches[0]['reason']
+        assert len(queries)<=12
+        queries.clear()
+        details=client.get(f'/restaurants/{rid}')
+        assert len(details.json()['menu'])==90
+        assert len(queries)<=3
+    finally:event.remove(engine,'before_cursor_execute',record)
