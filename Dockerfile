@@ -14,6 +14,7 @@ RUN --mount=type=bind,source=frontend,target=/src,readonly \
     npm ci --strict-ssl=true; npm run build; \
     mkdir -p /out/.next; cp -a .next/standalone/. /out/; \
     cp -a .next/static /out/.next/static; \
+    cp -a public /out/public; \
     rm -rf /build /root/.npm
 
 FROM python:3.12-slim-bookworm AS runtime
