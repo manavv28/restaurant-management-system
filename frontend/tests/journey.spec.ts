@@ -17,6 +17,19 @@ test('search, menu, account, favourites and consent',async({page})=>{
  await page.getByRole('button',{name:'Create account',exact:true}).click();
  await expect(page.getByRole('dialog')).not.toBeVisible();
  await page.getByRole('button',{name:'Save Sample · Wok & Wonder',exact:true}).click();
+ await expect(page.getByRole('button',{name:'Save Sample · Wok & Wonder',exact:true})).toHaveAttribute('aria-pressed','true');
+ await page.getByRole('button',{name:'Wok & Wonder',exact:true}).click();
+ const restaurantSave=page.getByRole('button',{name:'Saved restaurant',exact:true});
+ await expect(restaurantSave).toHaveAttribute('aria-pressed','true');
+ await expect(restaurantSave).toHaveClass(/favourite-saved/);
+ const dishSave=page.getByRole('button',{name:'Save Hakka noodles',exact:true});
+ await dishSave.click();await expect(dishSave).toHaveAttribute('aria-pressed','true');
+ await expect(dishSave).toHaveClass(/favourite-saved/);
+ await expect(page.locator('.toast')).toContainText('Saved to favourites.');
+ await expect(page.locator('.toast')).toBeHidden({timeout:6500});
+ await dishSave.click();await expect(dishSave).toHaveAttribute('aria-pressed','false');
+ await page.getByRole('button',{name:'Close',exact:true}).click();
+
  await page.getByRole('button',{name:'Your space'}).click();
  await expect(page.getByRole('heading',{name:'Saved for your next craving'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Sample · Wok & Wonder'})).toBeVisible();
