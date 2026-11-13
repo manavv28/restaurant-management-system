@@ -12,6 +12,8 @@ def test_pizza_snacks_cannot_hide_a_real_pizza_at_same_restaurant(client):
         assert client.post(f'/portal/restaurants/{rid}/menu',headers=owner,json={'name':name,'cuisine':'Italian','price_paise':price}).status_code==200
     rows=client.post('/search',json={'query':'pizza under 200','include_samples':False}).json()['results']
     assert len(rows)==1 and rows[0]['dish']['name']=='Margherita Pizza (Regular)'
+    snack=client.post('/search',json={'query':'pizza puff under 200','include_samples':False}).json()['results']
+    assert len(snack)==1 and snack[0]['dish']['name']=='BK Veg Pizza Puff.'
     with Session() as db:
         db.scalar(select(MenuItem).where(MenuItem.restaurant_id==rid,MenuItem.name=='Margherita Pizza (Regular)')).available=False;db.commit()
     assert client.post('/search',json={'query':'pizza under 200','include_samples':False}).json()['results']==[]

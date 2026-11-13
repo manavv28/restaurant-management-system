@@ -40,7 +40,8 @@ def parse_local(query, budget=500, radius=5):
     cuisine = None
     cuisines = ['Chinese','Indian','Italian','Japanese','Mexican','South Indian']
     cuisine = next((c for c in reversed(cuisines) if c.lower() in q), None)
-    dishes = ['hakka noodles','noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vadapav','vada pav']
+    dishes = ['hakka noodles','noodles soup','pizza puff','pizza pocket','pizza sandwich','pizza burger','pasta salad','pasta soup',
+              'noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vadapav','vada pav']
     def negated(term):
         token=r'(?<!\w)'+re.escape(term)+r'(?!\w)'
         return bool(re.search(r'(?:no|not|without|except|avoid|exclude)\s+(?:any\s+)?'+token,q) or re.search(token+r'\s+(?:nahi|nahin|mat|नहीं)\b',q))
