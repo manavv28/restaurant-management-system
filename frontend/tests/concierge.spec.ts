@@ -85,6 +85,9 @@ test('phone map stays exposed with filters and results collapsed, while desktop 
  await page.getByRole('button',{name:'Search filters',exact:true}).click();await expect(page.getByLabel('Maximum budget')).toBeHidden();
  await page.getByRole('button',{name:'Show results',exact:true}).click();await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeVisible();
  await page.getByRole('button',{name:'Hide results',exact:true}).click();await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeHidden();
+ await page.getByRole('button',{name:'Search filters',exact:true}).click();await page.getByRole('button',{name:'Show results',exact:true}).click();
+ await page.getByLabel('Your food craving').fill('Hakka noodles under 300 in Bandra');await page.getByLabel('Your food craving').press('Enter');
+ await expect(page.getByLabel('Your food craving')).not.toBeFocused();await expect(page.getByLabel('Maximum budget')).toBeHidden();await expect(page.getByRole('button',{name:'Show results',exact:true})).toBeVisible();
  await page.screenshot({path:'test-results/phone-map-space.png'});
  await page.setViewportSize({width:1440,height:1000});await expect(page.getByLabel('Maximum budget')).toBeVisible();await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeVisible();await expect(page.getByRole('button',{name:'Show results',exact:true})).toBeHidden();
 });

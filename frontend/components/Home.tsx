@@ -75,7 +75,7 @@ export default function Home({immersive=false}:{immersive?:boolean}){
  },[]);
  type QueryData={results:Match[];trace:Trace[];parser:string;follow_up:string;nearby_unpriced?:typeof unpriced;attribution:string;external_discovery:typeof external;intent?:Record<string,unknown>;verdict?:Verdict;research?:Research};
  async function search(e?:FormEvent,override?:string,allowResearch=true){
-   e?.preventDefault();const version=++searchVersion.current;searchAbort.current?.abort();const controller=new AbortController();searchAbort.current=controller;setSteps([]);setVerdict(null);setResearch(null);setShowAllResults(false);setMobileFiltersOpen(false);setMobileResultsOpen(false);setLoading(true);setError('');setSearchError('');setSearchStatus('Connecting to the search service…');
+   e?.preventDefault();if(immersive&&document.activeElement instanceof HTMLInputElement)document.activeElement.blur();const version=++searchVersion.current;searchAbort.current?.abort();const controller=new AbortController();searchAbort.current=controller;setSteps([]);setVerdict(null);setResearch(null);setShowAllResults(false);setMobileFiltersOpen(false);setMobileResultsOpen(false);setLoading(true);setError('');setSearchError('');setSearchStatus('Connecting to the search service…');
    try{
     await ensureSearchReady(()=>{if(version===searchVersion.current)setSearchStatus('Starting the search service. This may take up to a minute.')});
     if(version!==searchVersion.current)return;
