@@ -48,6 +48,7 @@ test('public PRD concierge serves a streamed verdict, phone map and actual Agent
  await page.getByLabel('Your food craving').fill('Chinese khane ka mann hai, Hakka noodles 300 mein 2 km ke andar Bandra mein?');
  await page.getByRole('button',{name:'Find my food',exact:true}).click();
  await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('listed option');
+ await page.getByRole('button',{name:'Show results',exact:true}).click();
  const shortlist=page.getByRole('list',{name:'Top restaurant matches'});
  await expect(shortlist.getByRole('button')).toHaveCount(3);
  await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('Up to ₹300 · 2 km');
@@ -55,6 +56,10 @@ test('public PRD concierge serves a streamed verdict, phone map and actual Agent
  await expect(page.getByRole('dialog')).toBeVisible();
  await page.getByRole('button',{name:'Close',exact:true}).click();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ await page.getByRole('button',{name:'Hide results',exact:true}).click();
+ await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeHidden();
+ const searchBox=await page.getByRole('region',{name:'Food search'}).boundingBox();const resultsSheet=await page.getByRole('region',{name:'Your food verdict'}).boundingBox();
+ expect(resultsSheet!.y-searchBox!.y-searchBox!.height).toBeGreaterThan(844*.4);
  await page.screenshot({path:'test-results/live-prd-concierge.png'});
  await page.getByRole('link',{name:'Coverage & list view'}).click();await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
  await page.goto('/agents');await expect(page.getByRole('heading',{name:'Meet your food crew.'})).toBeVisible();await expect(page.getByRole('heading',{name:'Catalogue job queue'})).toBeVisible();
