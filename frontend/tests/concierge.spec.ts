@@ -37,6 +37,7 @@ test('immersive PWA experience keeps the map, voice orb and verdict usable on a 
  await page.getByLabel('Your food craving').fill('Hakka noodles under 300 in Bandra');await page.getByRole('button',{name:'Find my food',exact:true}).click();
  await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('₹240');
  await expect(page.locator('.leaflet-interactive').first()).toBeVisible();
+ await page.getByRole('button',{name:'Show results',exact:true}).click();
  const shortlist=page.getByRole('list',{name:'Top restaurant matches'});await expect(shortlist).toContainText('Wok & Wonder');await expect(shortlist).toContainText('Hakka noodles');
  await shortlist.getByRole('button',{name:'View menu for Sample · Wok & Wonder',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Close',exact:true}).click();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
@@ -64,4 +65,26 @@ test('immersive map remains visible while a search is waiting on the backend',as
   await expect(page.getByRole('button',{name:'Speak your craving'})).toBeVisible();
   await expect(page.getByRole('status').filter({hasText:'Finding your next favourite'})).toBeVisible();
  } finally {release();}
+});
+
+
+test('phone map stays exposed with filters and results collapsed, while desktop retains its full panels',async({page})=>{
+ await page.goto('/concierge');await expect(page.getByRole('region',{name:'Your food verdict'})).toBeVisible();
+ for(const size of [{width:320,height:568},{width:390,height:844},{width:430,height:932}]){
+  await page.setViewportSize(size);
+  await expect(page.getByRole('button',{name:'Show results',exact:true})).toBeVisible();
+  await expect(page.getByLabel('Maximum budget')).toBeHidden();
+  const search=await page.getByRole('region',{name:'Food search'}).boundingBox();
+  const sheet=await page.getByRole('region',{name:'Your food verdict'}).boundingBox();
+  expect(search).toBeTruthy();expect(sheet).toBeTruthy();
+  expect(sheet!.y-search!.y-search!.height).toBeGreaterThan(size.height*.4);
+  const mapReceivesTouches=await page.evaluate(({x,y})=>!!document.elementFromPoint(x,y)?.closest('.map-wrapper'),{x:size.width/2,y:(search!.y+search!.height+sheet!.y)/2});expect(mapReceivesTouches).toBeTruthy();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ }
+ await page.getByRole('button',{name:'Search filters',exact:true}).click();await expect(page.getByLabel('Maximum budget')).toBeVisible();
+ await page.getByRole('button',{name:'Search filters',exact:true}).click();await expect(page.getByLabel('Maximum budget')).toBeHidden();
+ await page.getByRole('button',{name:'Show results',exact:true}).click();await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeVisible();
+ await page.getByRole('button',{name:'Hide results',exact:true}).click();await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeHidden();
+ await page.screenshot({path:'test-results/phone-map-space.png'});
+ await page.setViewportSize({width:1440,height:1000});await expect(page.getByLabel('Maximum budget')).toBeVisible();await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeVisible();await expect(page.getByRole('button',{name:'Show results',exact:true})).toBeHidden();
 });
