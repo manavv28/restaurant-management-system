@@ -1,0 +1,41 @@
+{
+  "origin": "https://restaurant-management-system-qxtx.vercel.app/concierge",
+  "viewports": [
+    {
+      "width": 320,
+      "height": 568,
+      "clear_map_height": 250,
+      "clear_map_fraction": 0.44,
+      "map_hit_test": true
+    },
+    {
+      "width": 390,
+      "height": 844,
+      "clear_map_height": 526,
+      "clear_map_fraction": 0.623,
+      "map_hit_test": true
+    },
+    {
+      "width": 430,
+      "height": 932,
+      "clear_map_height": 614,
+      "clear_map_fraction": 0.659,
+      "map_hit_test": true
+    }
+  ],
+  "filter_toggle": true,
+  "results_toggle": true,
+  "menu_open": true,
+  "search_blurs_input": true,
+  "desktop_full_panels": true,
+  "page_errors": [],
+  "application_release": "d5aede8dc2cbade7454efd761bbf897e98b96b0f",
+  "integration_run": 43433681417,
+  "public_verification_run": 43433681686,
+  "backend_tests_passed": 216,
+  "browser_journeys_passed": 37,
+  "public_checks_passed": 3,
+  "render_deployment": "dep-dbrh09l9fdbs73ec7ta0",
+  "vercel_deployment": "dpl_BMTp4Df6xsLrFXhxmsRWWktkUtSk",
+  "scope": "Responsive UI verification; not physical-device voice, performance or full PRD certification."
+}

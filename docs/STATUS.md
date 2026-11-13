@@ -1,8 +1,12 @@
 # Current BiteAI status
 
-Updated 13 November 2026. Application release `ae1cef5e2ce5` is deployed to [the selected frontend](https://restaurant-management-system-qxtx.vercel.app), with [Render Free](https://biteai-demo.onrender.com) as backend and Supabase PostgreSQL using verify-full TLS. No paid infrastructure was added.
+Updated 13 November 2026. Application release `d5aede8dc2cb` is deployed to [the selected frontend](https://restaurant-management-system-qxtx.vercel.app), with [Render Free](https://biteai-demo.onrender.com) as backend and Supabase PostgreSQL using verify-full TLS. No paid infrastructure was added.
 
 The public catalogue contains **10,404 real-source venues**, **357,694 source-listed prices across 2,613 restaurants**, and **8,747 public contact numbers**. There are no fictional samples in production. **7,791 venues still lack priced menus and 1,657 lack contacts**; an exhaustive Mumbai census has not been established. Original source dates and price context remain visible. These are reference observations, not current delivery or restaurant-confirmed quotes.
+
+## Phone map update
+
+The phone concierge defaults to a compact search row with filters closed and a small **Show results** handle. Filters and the top-three shortlist open on demand; **Hide results** reveals the map again. Submission closes both panels and blurs the text field. Progress is condensed and the voice control sits in the corner. Desktop panels retain their full layout. Public checks at 320×568, 390×844 and 430×932 measured 44%, 62.3% and 65.9% clear viewport height between the controls, verified map hit testing, toggles, menu opening, Enter-key focus and desktop presentation with zero JavaScript page errors. [PR #23](https://github.com/manavv28/restaurant-management-system/pull/23); [verification](catalog/mobile-map-2026-11-13.json).
 
 ## Suggestion display update
 
@@ -21,7 +25,7 @@ Restaurant cards start with the top three ranked matches. **Show more** reveals 
 
 ## Verification and practical limits
 
-Hosted integration **[43429838464](https://github.com/manavv28/restaurant-management-system/actions/runs/43429838464)** passed **216 backend tests** (one native-PDF skip), **36 browser journeys**, migration/transfer checks, production frontend/Docker builds and non-root database smoke. Public release **[43429838416](https://github.com/manavv28/restaurant-management-system/actions/runs/43429838416)** passed the live checks. See [PRD traceability](PRD_TRACEABILITY.md) and [search latency evidence](SEARCH_LATENCY.md).
+Hosted integration **[43433681417](https://github.com/manavv28/restaurant-management-system/actions/runs/43433681417)** passed **216 backend tests** (one native-PDF skip), **37 browser journeys**, migration/transfer checks, production frontend/Docker builds and non-root database smoke. Public release **[43433681686](https://github.com/manavv28/restaurant-management-system/actions/runs/43433681686)** passed the live checks. See [PRD traceability](PRD_TRACEABILITY.md) and [search latency evidence](SEARCH_LATENCY.md).
 
 Five sequential warm original-brief probes returned 15 matches within ₹300/2 km, with a median verdict of **1.9 seconds**, improved from 13.5 seconds before the coverage-path fix. The first-event median was 835 ms in that test network. This does **not** certify a representative p95, the 600 ms first-event target or 100 concurrent users. Render Free can sleep.
 
