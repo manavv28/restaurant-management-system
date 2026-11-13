@@ -121,6 +121,7 @@ test('hosted checkout callback waits for verified server status',async({page})=>
  let captured=false;
  await page.route('**/api/payments/orders/order_BrowserFixture',route=>route.fulfill({json:{state:captured?'captured':'created'}}));
  await page.goto('/');
+ await page.getByRole('button',{name:/^Show more \(/}).click();
  await page.getByRole('button',{name:`Checkout Kitchen ${suffix}`,exact:true}).click();
  await page.getByLabel('Bill amount (₹)').fill('250');
  await page.getByRole('button',{name:'Open secure checkout'}).click();
