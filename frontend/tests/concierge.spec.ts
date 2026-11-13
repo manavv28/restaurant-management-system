@@ -3,7 +3,7 @@ import {test,expect} from '@playwright/test';
 test('Hinglish streaming verdict preserves context and exposes honest confidence',async({page})=>{
  await page.goto('/');await page.getByLabel('Your food craving').fill('Chinese khane ka mann hai, Hakka noodles 300 mein 2 km ke andar Bandra mein?');
  await page.getByRole('button',{name:'Find my food',exact:true}).click();
- const verdict=page.getByRole('region',{name:'Your food verdict'});await expect(verdict).toContainText('₹240');await expect(verdict).toContainText('Confirm current price');
+ const verdict=page.getByRole('region',{name:'Your food verdict'});await expect(verdict).toContainText('₹240');await expect(verdict).toContainText('Confirm current price');await expect(verdict).toContainText('Bandra · Up to ₹300 · 2 km');
  await expect(page.getByRole('button',{name:'Wok & Wonder',exact:true})).toBeVisible();
  await verdict.getByRole('button',{name:'Sabse paas',exact:true}).click();await expect(verdict).toContainText('₹240');
  const last=await page.getByLabel('Your food craving').inputValue();expect(last).toBe('Sabse paas');
@@ -37,6 +37,8 @@ test('immersive PWA experience keeps the map, voice orb and verdict usable on a 
  await page.getByLabel('Your food craving').fill('Hakka noodles under 300 in Bandra');await page.getByRole('button',{name:'Find my food',exact:true}).click();
  await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('₹240');
  await expect(page.locator('.leaflet-interactive').first()).toBeVisible();
+ const shortlist=page.getByRole('list',{name:'Top restaurant matches'});await expect(shortlist).toContainText('Wok & Wonder');await expect(shortlist).toContainText('Hakka noodles');
+ await shortlist.getByRole('button',{name:'View menu for Sample · Wok & Wonder',exact:true}).click();await expect(page.getByRole('dialog')).toBeVisible();await page.getByRole('button',{name:'Close',exact:true}).click();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await expect(page.getByRole('link',{name:'Coverage & list view'})).toHaveAttribute('href','/');await page.getByRole('link',{name:'Coverage & list view'}).click();await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
 });

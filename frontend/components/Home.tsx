@@ -29,7 +29,7 @@ const request=apiRequest;
 const post=(body:unknown)=>({method:'POST',body:JSON.stringify(body)});
 export default function Home({immersive=false}:{immersive?:boolean}){
  const [areas,setAreas]=useState(defaultAreas);
- const [attribution,setAttribution]=useState('');
+ const [attribution,setAttribution]=useState(''),[queryScope,setQueryScope]=useState('');
  const [external,setExternal]=useState<{name:string;address:string;distance_km:number;maps_url:string;notice:string}[]>([]);
  const [unpriced,setUnpriced]=useState<{restaurant:Restaurant;distance_km:number;notice:string}[]>([]);
  const [tab,setTab]=useState('discover'),[area,setArea]=useState('Bandra'),[query,setQuery]=useState(''),[budget,setBudget]=useState(500),[radius,setRadius]=useState(5),[samples,setSamples]=useState(process.env.NODE_ENV!=='production');
@@ -82,7 +82,7 @@ export default function Home({immersive=false}:{immersive?:boolean}){
     const data=await queryRequest<QueryData>({query:override??query,area,budget,radius_km:radius,include_samples:samples,stream:true,research:allowResearch,context:intentContext.current,...coords},step=>{if(version===searchVersion.current)setSteps(previous=>[...previous,step])},controller.signal);
     if(version!==searchVersion.current)return;
     if(!Array.isArray(data.results)||!Array.isArray(data.trace))throw new Error('The search service returned an incomplete response. Please retry.');
-    if(data.intent)intentContext.current=data.intent;setVerdict(data.verdict||null);setResearch(data.research||null);
+    if(data.intent){intentContext.current=data.intent;setQueryScope((data.intent.location||area)+' · Up to ₹'+data.intent.max_budget+' · '+data.intent.radius_km+' km')}setVerdict(data.verdict||null);setResearch(data.research||null);
     setSearched(true);setAttribution(data.attribution||'');setExternal(data.external_discovery||[]);setResults(data.results);setUnpriced(data.nearby_unpriced||[]);setTrace(data.trace);setParser(data.parser);setFollowUp(data.follow_up||'');
     window.dispatchEvent(new Event('biteai:catalog-updated'));
     if(user)void refreshAccount().catch(()=>{});
@@ -159,7 +159,7 @@ export default function Home({immersive=false}:{immersive?:boolean}){
  <section className="discover-section"><CatalogCoverage/><DeliveryPlatforms query={query} area={area} budget={budget} radius={radius} coords={coords} userId={user?.id??null} onSignIn={()=>setAuth(true)}/><CatalogDirectory areas={areas} onSelect={id=>openRestaurant(id,false)}/>{external.length>0&&<section className="panel"><h2>Nearby discoveries without confirmed menu prices</h2>{external.map((r,i)=><p key={i}>{r.name} · {r.distance_km} km · {r.address} · {r.notice} {r.maps_url&&<a href={r.maps_url} target="_blank" rel="noreferrer">View on Google Maps</a>}</p>)}</section>}<div className="section-heading"><div><div className="eyebrow muted">FOLLOW YOUR APPETITE</div><h2>What sounds good?</h2></div><span className="hand-note">There’s always a new favourite ↘</span></div>
  <div className="categories">{foods.map(f=><button className={(query===f.name||(!query&&f.name==='All cravings'))?'selected':''} key={f.name} onClick={()=>{const q=f.name==='All cravings'?'':f.name;setQuery(q);search(undefined,q)}}><span>{f.icon}</span>{f.name}</button>)}</div>
  {loading&&<AgentTrace steps={steps} loading={loading}/>}
- {verdict&&!searchError&&<VerdictCard value={verdict} onFollowUp={text=>{setQuery(text);void search(undefined,text)}} onExplore={()=>document.querySelector('.results-heading')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}/>}
+ {verdict&&!searchError&&<VerdictCard value={verdict} options={results} onSelect={id=>openRestaurant(id)} scope={queryScope} onFollowUp={text=>{setQuery(text);void search(undefined,text)}} onExplore={immersive?undefined:()=>document.querySelector('.results-heading')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth'})}/>}
  {research?.message&&research.state!=='not_needed'&&research.state!=='idle'&&<p className="follow-up" role="status">{research.message}</p>}
  <FoodSuggestions area={area} samples={samples} signedIn={!!user} onSelect={openRestaurant} revision={history.length}/><div className="results-heading"><div><h2>{searchError?'Search unavailable':query?'A few good matches':'Good food, close to you'} <span className="result-count">{loading?'…':searchError?'—':results.length}</span></h2><p>{searchError?(searched?'Previous results, if any, are shown below.':'Your search has not completed yet.'):query?'Matched to your craving, budget and distance.':'A little inspiration for your next meal in '+area+'.'}</p></div><div className="view-switch"><button aria-label="List view" className={view==='list'?'active':''} onClick={()=>setView('list')}><LayoutGrid size={17}/></button><button aria-label="Map view" className={view==='map'?'active':''} onClick={()=>setView('map')}><MapIcon size={17}/></button></div></div>
  <div className="data-note"><span className="sample-badge">{samples?'DEMO DATA':'REAL CATALOG'}</span> {samples?'Fictional sample listings are included. Sample menus are not real or verified prices.':'Real catalog records only. Source-observed and owner prices need confirmation with the restaurant.'}</div>
