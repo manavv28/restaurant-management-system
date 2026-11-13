@@ -20,11 +20,11 @@ test('search, menu, account, favourites and consent',async({page})=>{
  await page.getByRole('button',{name:'Your space'}).click();
  await expect(page.getByRole('heading',{name:'Saved for your next craving'})).toBeVisible();
  await expect(page.getByRole('button',{name:'Sample · Wok & Wonder'})).toBeVisible();
- await page.getByLabel('I consent to payment-data processing').check();
+ await page.getByLabel('Allow BiteAI payment records to be processed for spend-based rewards').check();
  await expect(page.getByRole('button',{name:'Simulate transaction'})).toBeEnabled();
  await page.getByRole('button',{name:'Simulate transaction'}).click();
  await expect(page.getByText('SIMULATED · not verified',{exact:true})).toBeVisible();
- await page.getByLabel('I consent to payment-data processing').uncheck();
+ await page.getByLabel('Allow BiteAI payment records to be processed for spend-based rewards').uncheck();
  await expect(page.getByRole('button',{name:'Simulate transaction'})).toBeDisabled();
 });
 test('mobile layout and map interaction',async({page})=>{
@@ -162,8 +162,9 @@ test('supported voice adapter submits recognised text and unsupported browsers f
 });
 
 test('discovery extras are honest and recovery reports unavailable email delivery',async({page})=>{
- await page.goto('/');await expect(page.getByRole('heading',{name:'Popular dishes',exact:true})).toBeVisible();
+ await page.goto('/');await expect(page.getByRole('heading',{name:'Frequently shown dishes',exact:true})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Picked for you',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'Sign in',exact:true}).click();
  await page.getByRole('button',{name:'Forgot your password?'}).click();
  await expect(page.getByText('Email delivery is not available yet. Please try again once the service is configured.')).toBeVisible();
  await expect(page.getByRole('button',{name:'Send reset link'})).toBeDisabled();
@@ -173,7 +174,7 @@ test('a delayed account refresh cannot overwrite a consent change',async({page})
  const headers={'X-BiteAI-Client':'browser'};
  await page.request.post('/api/auth/register',{headers,data:{name:'Consent Race',email:`consent${Date.now()}@example.test`,password:'a-test-password-123'}});
  await page.goto('/');await page.getByRole('button',{name:'Your space'}).click();
- await expect(page.getByLabel('I consent to payment-data processing')).toBeVisible();
+ await expect(page.getByLabel('Allow BiteAI payment records to be processed for spend-based rewards')).toBeVisible();
  await page.getByRole('button',{name:'Discover',exact:true}).click();
  let release:()=>void=()=>{};
  const gate=new Promise<void>(resolve=>{release=resolve});
@@ -187,9 +188,9 @@ test('a delayed account refresh cannot overwrite a consent change',async({page})
  await page.getByRole('button',{name:'Your space'}).click();await requested;
  try{
   const update=page.waitForResponse(response=>response.url().endsWith('/api/me/consent')&&response.request().method()==='PUT');
-  await page.getByLabel('I consent to payment-data processing').check();
+  await page.getByLabel('Allow BiteAI payment records to be processed for spend-based rewards').check();
   expect((await update).ok()).toBeTruthy();
  }finally{release()}
  await finished;
- await expect(page.getByLabel('I consent to payment-data processing')).toBeChecked();
+ await expect(page.getByLabel('Allow BiteAI payment records to be processed for spend-based rewards')).toBeChecked();
 });
