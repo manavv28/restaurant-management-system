@@ -30,5 +30,5 @@ test('excluded noodles return other Chinese food and area follow-up keeps the bu
  await expect(page.locator('.restaurant-grid')).not.toContainText('Hakka noodles');
  await page.getByLabel('Your food craving').fill('same budget, Andheri mein');
  await page.getByRole('button',{name:'Find my food',exact:true}).click();
- await expect(verdict).toContainText('Andheri · Up to ₹300 · 2 km');
+ await expect(verdict).toContainText('Andheri area centre · Up to ₹300 · 2 km');
 });

@@ -111,15 +111,33 @@ def menu_search(db, intent, lat, lng, include_samples=True):
         MenuItem.available.is_(True),MenuItem.price_paise<=intent.max_budget*100//(intent.party_size if intent.budget_scope=='total' else 1),
         or_(MenuEvidence.menu_item_id.is_(None),and_(MenuEvidence.active.is_(True),MenuEvidence.expires_at>now())))
     if not include_samples:query=query.where(Restaurant.sample.is_(False))
-    if intent.cuisine:query=query.where(or_(Restaurant.cuisine.icontains(intent.cuisine,autoescape=True),MenuItem.cuisine.icontains(intent.cuisine,autoescape=True)))
-    if intent.dish:query=query.where(MenuItem.name.icontains(intent.dish,autoescape=True),~MenuItem.name.contains(' / '),~MenuItem.name.icontains(' or '))
+    # A recognised dish is stronger evidence than a venue's broad/absent cuisine tag.
+    dish_cuisines={'hakka noodles':'Chinese','noodles':'Chinese','pizza':'Italian','pasta':'Italian','dosa':'South Indian','sushi':'Japanese'}
+    if intent.cuisine and dish_cuisines.get((intent.dish or '').casefold())!=intent.cuisine:
+        query=query.where(or_(Restaurant.cuisine.icontains(intent.cuisine,autoescape=True),MenuItem.cuisine.icontains(intent.cuisine,autoescape=True)))
+    name=func.lower(MenuItem.name)
+    for punctuation in ('-','(',')','.',',',':','&'):
+        name=func.replace(name,punctuation,' ')
+    padded=' '+name+' '
+    if intent.dish:
+        phrase=intent.dish.casefold().strip()
+        aliases={'burger':['burger','cheeseburger'],'tacos':['tacos','taco']}.get(phrase,[phrase])
+        query=query.where(or_(*(padded.contains(' '+alias+' ',autoescape=True) for alias in aliases)),~MenuItem.name.contains(' / '),~MenuItem.name.icontains(' or '))
+        # Related snacks are not the requested dish. Explicit custom snack queries still work.
+        derivatives={'pizza':('puff','puffs','pocket','pockets','sandwich','burger','fries'),
+                     'burger':('pizza','sandwich','fries'), 'noodles':('soup','samosa','spring roll'),
+                     'hakka noodles':('soup','samosa','spring roll'),'pasta':('soup','salad','sandwich'),
+                     'biryani':('arancini','samosa'),'dosa':('chips',)}
+        for term in derivatives.get(phrase,()):query=query.where(~padded.contains(' '+term+' ',autoescape=True))
     for term in intent.excluded_dishes:
         if term:query=query.where(~MenuItem.name.icontains(term[:150],autoescape=True))
     for term in intent.excluded_cuisines:
         if term:query=query.where(~Restaurant.cuisine.icontains(term[:100],autoescape=True),~MenuItem.cuisine.icontains(term[:100],autoescape=True))
-    if not intent.dish and not intent.cuisine:
+    if not intent.dish:
         # Generic discovery should suggest meals, not the cheapest bread or condiment.
         query=query.where(~func.lower(func.trim(MenuItem.name)).in_(['pav','plain pav','butter pav','pav / butter pav','chapati','roti','tandoori roti','slice bread','bread','extra cheese','water','mineral water']))
+        for prefix in ('bisleri','aquafina','kinley','mineral water','packaged water','bottled water','extra ','add on ','add-on ','christmas special cookies'):
+            query=query.where(~func.lower(MenuItem.name).startswith(prefix,autoescape=True))
     if intent.diet:query=query.where(MenuItem.dietary==intent.diet)
     eligible=candidates(db,query,lat,lng,intent.radius_km).subquery()
     rows=db.execute(select(eligible).where(eligible.c.choice==1)).mappings().all()

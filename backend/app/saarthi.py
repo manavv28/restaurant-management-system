@@ -209,10 +209,14 @@ def activity(db=Depends(db_session)):
         error=(job.error or '').lower()
         category='rate_limited' if '429' in error else 'source_access' if any(t in error for t in ('robots','403','404','410','disabled')) else 'extraction_or_identity' if any(t in error for t in ('unambiguous','identity','brand','area','extract')) else 'provider_or_worker'
         categories[category]=categories.get(category,0)+1
+    alerts=[]
     last_success=db.scalar(select(func.max(CatalogJob.finished_at)).where(CatalogJob.state=='succeeded'))
     overdue=(datetime.now(timezone.utc)-timedelta(minutes=10)).isoformat()
     stalled=db.scalar(select(func.count()).select_from(CatalogJob).where(CatalogJob.state=='running',CatalogJob.started_at<overdue)) or 0
-    return {'source_health':{'latest_failed_sources':len(failures),'failure_categories':categories,'last_successful_collection':last_success,'stalled_jobs':stalled,'retry_policy':'3 attempts with exponential backoff; source review failures cool down for at least 24 hours. Work runs while the free service is awake.'},'jobs':dict(jobs),'agents':[{'id':r.id,'agent':r.agent,'state':r.status,'latency_ms':r.latency_ms,'cost_microrupees':r.cost_microrupees,'created_at':r.created_at} for r in runs],
+    if failures:alerts.append('Some source checks failed. Their last observation is not a current restaurant quote.')
+    if stalled:alerts.append('Worker leases are overdue; the next worker cycle will recover them.')
+    if not last_success or last_success<(datetime.now(timezone.utc)-timedelta(hours=24)).isoformat():alerts.append('No successful collection in the last 24 hours. Check worker availability.')
+    return {'source_health':{'alerts':alerts,'latest_failed_sources':len(failures),'failure_categories':categories,'last_successful_collection':last_success,'stalled_jobs':stalled,'retry_policy':'3 attempts with exponential backoff; source review failures cool down for at least 24 hours. Work runs while the free service is awake.'},'jobs':dict(jobs),'agents':[{'id':r.id,'agent':r.agent,'state':r.status,'latency_ms':r.latency_ms,'cost_microrupees':r.cost_microrupees,'created_at':r.created_at,'execution':json.loads(r.summary).get('parser','Execution type not recorded')} for r in runs],
             'notice':'Actual recorded runs. No individual search text, account details or private platform responses are exposed.'}
 
 def admin(user=Depends(current_user)):
