@@ -121,3 +121,7 @@
 .verdict-option span>span { font-size:12px; line-height:1.5; }
 .verdict-option b { white-space:nowrap; color:var(--orange); }
 .verdict-option small { margin-top:5px; font-size:10px; }
+
+.results-expansion { display:flex; flex-direction:column; align-items:center; gap:12px; margin:28px 0; }
+.results-expansion>span { font-size:12px; color:var(--muted); }
+.results-expansion button { min-height:44px; padding:12px 28px; border-radius:14px; }

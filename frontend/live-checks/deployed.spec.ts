@@ -13,6 +13,13 @@ test('public release serves the real catalog, source details and a responsive mo
  await page.goto('/',{waitUntil:'domcontentloaded'});
  await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
  await expect(page.getByLabel('Sample listings')).not.toBeChecked();
+ if(search.results.length>3){
+  await expect(page.locator('.restaurant-card')).toHaveCount(3);
+  await page.getByRole('button',{name:/^Show more \(/}).click();
+  await expect(page.locator('.restaurant-card')).toHaveCount(search.results.length);
+  await page.getByRole('button',{name:'Show less',exact:true}).click();
+  await expect(page.locator('.restaurant-card')).toHaveCount(3);
+ }
  await page.locator('.restaurant-card .card-title button, .catalog-panel .history-row button').filter({hasText:restaurant.name}).first().click();
  await expect(page.getByRole('dialog')).toContainText(restaurant.name);
  await expect(page.getByRole('dialog').locator('.source-note')).toContainText('Source:');
