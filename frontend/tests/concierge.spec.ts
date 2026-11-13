@@ -3,7 +3,7 @@ import {test,expect} from '@playwright/test';
 test('Hinglish streaming verdict preserves context and exposes honest confidence',async({page})=>{
  await page.goto('/');await page.getByLabel('Your food craving').fill('Chinese khane ka mann hai, Hakka noodles 300 mein 2 km ke andar Bandra mein?');
  await page.getByRole('button',{name:'Find my food',exact:true}).click();
- const verdict=page.getByRole('region',{name:'Your food verdict'});await expect(verdict).toContainText('₹240');await expect(verdict).toContainText('Confirm current price');await expect(verdict).toContainText('Bandra · Up to ₹300 · 2 km');
+ const verdict=page.getByRole('region',{name:'Your food verdict'});await expect(verdict).toContainText('₹240');await expect(verdict).toContainText('Confirm current price');await expect(verdict).toContainText('Bandra area centre · Up to ₹300 · 2 km');
  await expect(page.getByRole('button',{name:'Wok & Wonder',exact:true})).toBeVisible();
  await verdict.getByRole('button',{name:'Sabse paas',exact:true}).click();await expect(verdict).toContainText('₹240');
  const last=await page.getByLabel('Your food craving').inputValue();expect(last).toBe('Sabse paas');

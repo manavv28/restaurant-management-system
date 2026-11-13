@@ -1,0 +1,62 @@
+/* Explicit origin, editable constraints and concise evidence. */
+.location-context { font-size:12px; line-height:1.6; color:var(--muted); margin:0; padding-bottom:14px; }
+.search-constraints { margin:0 0 18px; min-width:0; }
+.constraint-chips { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+.constraint-chips>span { padding:8px 12px; border:1px solid var(--line); border-radius:20px; font-size:12px; overflow-wrap:anywhere; }
+.constraint-editor { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:14px; padding:18px; border:1px solid var(--line); border-radius:14px; }
+.constraint-editor label { min-width:0; }
+.constraint-editor .primary { align-self:end; }
+.match-evidence,.verdict-evidence,.coverage-details { margin:12px 0; font-size:12px; line-height:1.65; }
+.match-evidence summary,.verdict-evidence summary,.coverage-details summary { cursor:pointer; min-height:44px; display:flex; align-items:center; gap:8px; font-weight:600; }
+.match-evidence summary::before,.verdict-evidence summary::before,.coverage-details summary::before { content:'+'; font-size:18px; }
+.match-evidence[open] summary::before,.verdict-evidence[open] summary::before,.coverage-details[open] summary::before { content:'−'; }
+.verdict-card .verdict-caution { margin-bottom:8px; }
+.coverage-table-wrap { overflow:auto; }
+.coverage-table-wrap table { width:100%; border-collapse:collapse; font-size:12px; }
+.coverage-table-wrap :is(th,td) { text-align:left; padding:10px 8px; border-bottom:1px solid var(--line); }
+.coverage-table-wrap caption { text-align:left; margin:8px 0; font-weight:600; }
+.collection-alert { border-left:3px solid var(--orange); padding:8px 12px; }
+.header nav,.header-right,.results-heading>div:first-child { min-width:0; }
+.results-heading>div:first-child { flex:1; }
+.view-switch { flex-shrink:0; }
+.card-footer { flex-wrap:wrap; }
+@media (min-width:761px) and (max-width:1000px) {
+ .header { padding-left:3%; padding-right:3%; gap:12px; }
+ .header nav { gap:10px; }
+ .header nav button { font-size:11px; gap:5px; }
+ .header-right { gap:4px; }
+ .agent-wall-link { display:none; }
+ .hero { overflow:hidden; }
+ .restaurant-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+}
+@media (max-width:760px) {
+ main:not(.immersive-discovery)>.hero { display:block; padding:76px 6% 20px; }
+ main:not(.immersive-discovery)>.hero .food-art,main:not(.immersive-discovery)>.hero .hero-notes,main:not(.immersive-discovery)>.hero .eyebrow { display:none; }
+ main:not(.immersive-discovery)>.hero h1 { font-size:28px; line-height:1.15; letter-spacing:-.8px; margin:0; }
+ main:not(.immersive-discovery)>.hero h1 br { display:none; }
+ main:not(.immersive-discovery)>.hero h1 em { display:block; }
+ main:not(.immersive-discovery)>.hero p { font-size:12px; max-width:none; margin:12px 0 0; }
+ main:not(.immersive-discovery)>.search-section { margin-top:0; }
+ .restaurant-grid { grid-template-columns:minmax(0,1fr); }
+ .restaurant-card .card-art { height:92px; }
+ .restaurant-card .food-emoji { font-size:60px; }
+ .card-detail,.confidence-chip,.restaurant-location { font-size:12px; }
+ .card-title button { min-height:44px; }
+ .card-links a,.card-footer button,.save-btn,.close,.toast button,.view-switch button,.experience-controls button,.map-experience-link { min-height:44px; min-width:44px; }
+ .save-btn { width:44px; height:44px; }
+ .header nav button { min-height:44px; }
+ .search-box input,form input,form select { font-size:16px; }
+ .constraint-editor { grid-template-columns:repeat(2,minmax(0,1fr)); padding:14px; }
+ .constraint-editor .primary { grid-column:1/-1; }
+ .header-right .experience-controls { gap:0; }
+ .header-right .map-experience-link { display:none; }
+ .header-right .sign-in { padding-left:10px; padding-right:10px; }
+ .search-filters select { min-height:44px; }
+ .location-context { font-size:12px; }
+ .results-heading { gap:10px; }
+ .results-heading h2 { flex-wrap:wrap; }
+ .immersive-discovery .location-context { display:none; }
+ .immersive-discovery .filters-open+.location-context { display:block; }
+}
+
+[data-theme="night"] .result-count { background:#293e2d; color:#e5ece2; }

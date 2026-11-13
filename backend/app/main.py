@@ -256,9 +256,12 @@ def search_database(body,intent,parser,user,db,progress=None):
             details=menu_details(db,menu,restaurant_row=venue)
             alternatives.append({'restaurant_id':venue.id,'restaurant_name':venue.name,'dish_name':menu.name,'price_paise':menu.price_paise,'listed_subtotal_paise':menu.price_paise*(intent.party_size if intent.budget_scope=='total' else 1),'distance_km':round(distance,2),'price_status':details.get('price_status','Unverified'),'source':menu.source})
     data['alternatives']=alternatives
+    data['search_origin']={'kind':'gps' if body.latitude is not None and not intent.location else 'area_centre',
+                           'label':'Your shared GPS location' if body.latitude is not None and not intent.location else area+' area centre',
+                           'latitude':lat,'longitude':lng,'distance_type':'straight-line'}
     data['verdict']=verdict(data,intent)
     data['research']=request_research(db,search_record,data,body,intent) if body.research and body.stream and not unique else {'state':'not_needed' if unique else 'idle','message':'Cached catalogue answer'}
-    db.add(AgentRun(id=uuid.uuid4().hex,agent='Saarthi',status='succeeded',search_id=search_record.id,summary=json.dumps({'tools':['parse_intent','geo_menu_search','source_attribution','campaign_eligibility'],'matches':len(unique)}),latency_ms=int((time.monotonic()-started)*1000),cost_microrupees=None if os.getenv('GEMINI_API_KEY') else 0));db.commit()
+    db.add(AgentRun(id=uuid.uuid4().hex,agent='Saarthi',status='succeeded',search_id=search_record.id,summary=json.dumps({'parser':parser,'tools':['parse_intent','geo_menu_search','source_attribution','campaign_eligibility'],'matches':len(unique)}),latency_ms=int((time.monotonic()-started)*1000),cost_microrupees=None if parser.startswith(('Gemini','Local model')) else 0));db.commit()
     return data
 
 @app.post('/query/stream')
@@ -503,7 +506,9 @@ def calculate_coverage(db):
     statement=select(real_counts,price_counts,source_counts,select(func.max(CatalogIdentity.observed_at)).scalar_subquery().label('last_identity')).select_from(real_counts.join(price_counts,text('true')).join(source_counts,text('true')))
     counts=dict(db.execute(statement).mappings().one())
     last=max((value for value in (counts.pop('last_source'),counts.pop('last_identity')) if value),default=None)
-    return {**counts,'menu_coverage_percent':round(100*counts['source_priced_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'unpriced_restaurants':max(0,counts['real_restaurants']-counts['source_priced_restaurants']),'snapshot_at':snapshot_at,'cache_max_age_seconds':60 if os.getenv('APP_ENV')=='production' else 0,'phone_coverage_percent':round(100*counts['public_phone_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'last_successful_collection':last,
+    from .coverage import locality_coverage
+    local=locality_coverage(db)
+    return {**counts,**local,'menu_coverage_percent':round(100*counts['source_priced_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'unpriced_restaurants':max(0,counts['real_restaurants']-counts['source_priced_restaurants']),'snapshot_at':snapshot_at,'cache_max_age_seconds':60 if os.getenv('APP_ENV')=='production' else 0,'phone_coverage_percent':round(100*counts['public_phone_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'last_successful_collection':last,
             'coverage':'Mumbai City and Mumbai Suburban listings; coverage is not exhaustive. Prices are published observations, not real-time restaurant quotes. Third-party listings may be dated and differ for delivery, portions or fees; source dates are shown where available.',
             'attribution':'Menu listing facts when present: IndiaRestros and its named sources (public API terms). Place sources: Overture Maps contributors (CDLA Permissive 2.0, Apache 2.0, CC0); © OpenStreetMap contributors (ODbL). See data sources for notices.'}
 

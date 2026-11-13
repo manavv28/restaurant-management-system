@@ -6,7 +6,7 @@ import logging
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 import httpx
-from sqlalchemy import select, update
+from sqlalchemy import select, update,func
 from sqlalchemy.exc import IntegrityError
 from .database import Base, engine, Session, CatalogSource, CatalogJob, now
 from .catalog import future, discover_osm, import_osm, fetch_menu, structured_menu, ai_menu, persist_menu, OSM_URL
@@ -43,7 +43,14 @@ def retry_cooldown(source,latest):
 
 def schedule(db):
     queued=0
-    for source in db.scalars(select(CatalogSource).where(CatalogSource.enabled.is_(True))).all():
+    from .database import Search,MenuEvidence,MenuItem
+    cutoff=(datetime.now(timezone.utc)-timedelta(days=30)).isoformat()
+    demand=dict(db.execute(select(Search.area,func.count()).where(Search.created_at>=cutoff,Search.query!='').group_by(Search.area)).all())
+    priced=set(db.scalars(select(MenuItem.restaurant_id).join(MenuEvidence,MenuEvidence.menu_item_id==MenuItem.id).where(MenuItem.available.is_(True),MenuEvidence.active.is_(True),MenuEvidence.expires_at>now()).distinct()))
+    sources=db.scalars(select(CatalogSource).where(CatalogSource.enabled.is_(True))).all()
+    # Fill menu gaps before routine refreshes, prioritising actual locality demand.
+    sources.sort(key=lambda source:(source.restaurant_id in priced,-demand.get(source.area,0),source.checked_at or '',source.id))
+    for source in sources:
         if source.checked_at and source.checked_at>=(datetime.now(timezone.utc)-timedelta(hours=source.refresh_hours)).isoformat():continue
         if db.scalar(select(CatalogJob.id).where(CatalogJob.source_id==source.id,CatalogJob.state.in_(['queued','running']))):continue
         latest=db.scalar(select(CatalogJob).where(CatalogJob.source_id==source.id).order_by(CatalogJob.id.desc()).limit(1))
@@ -102,7 +109,11 @@ async def run_one(job_id=None):
                     from .discovery import menu_candidates
                     from types import SimpleNamespace
                     for candidate in menu_candidates(html,source.url)[:3]:
-                        candidate_html=await fetch_menu(SimpleNamespace(url=candidate))
+                        try: candidate_html=await fetch_menu(SimpleNamespace(url=candidate))
+                        except (httpx.HTTPError,ValueError) as exc:
+                            trace.append({'agent':'Source discovery','tool':'menu_link_unavailable','url':candidate,
+                                          'reason':f'HTTP {exc.response.status_code}' if isinstance(exc,httpx.HTTPStatusError) else type(exc).__name__})
+                            continue
                         candidate_items,candidate_text=structured_menu(candidate_html)
                         if candidate_items:
                             html=candidate_html;items=candidate_items;text=candidate_text;observed_url=candidate
