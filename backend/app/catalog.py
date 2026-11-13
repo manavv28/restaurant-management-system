@@ -218,7 +218,7 @@ def persist_menu(db,source,html,items,page_url=None):
         evidence=db.get(MenuEvidence,item.id)
         if evidence is None:evidence=MenuEvidence(menu_item_id=item.id);db.add(evidence)
         evidence.source_id=source.id;evidence.excerpt=incoming['excerpt'];evidence.method=incoming['method']
-        evidence.content_hash=digest;evidence.fetched_at=now();evidence.expires_at=future(source.refresh_hours*2);evidence.active=True
+        evidence.content_hash=digest;evidence.fetched_at=now();evidence.expires_at=future(source.refresh_hours*2);evidence.active=not incoming['method'].startswith('Gemini')
         changes.append({'menu_item_id':item.id,'before_paise':before,'after_paise':item.price_paise})
     db.add(IngestionLog(restaurant_id=source.restaurant_id,source=source.url,trace=json.dumps(changes)))
     return {'changes':changes,'content_hash':digest}

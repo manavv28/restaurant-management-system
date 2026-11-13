@@ -33,3 +33,19 @@ test('the original noodles request respects price, radius and real-source constr
  }
  expect(data.trace.length).toBeGreaterThan(0);
 });
+
+test('public PRD concierge serves a streamed verdict, phone map and actual Agent Wall',async({page})=>{
+ await expect.poll(async()=>{try{const response=await page.request.get('/manifest.webmanifest');return response.ok()?(await response.json()).start_url:'pending'}catch{return 'pending'}},{timeout:240000,intervals:[5000]}).toBe('/concierge');
+ await page.goto('/concierge',{waitUntil:'domcontentloaded'});
+ await expect(page.getByLabel('Interactive restaurant map')).toBeVisible();await expect(page.getByRole('button',{name:'Speak your craving'})).toBeVisible();
+ await page.getByLabel('Your food craving').fill('Chinese khane ka mann hai, Hakka noodles 300 mein 2 km ke andar Bandra mein?');
+ await page.getByRole('button',{name:'Find my food',exact:true}).click();
+ await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('listed option');
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ await page.screenshot({path:'test-results/live-prd-concierge.png'});
+ await page.getByRole('link',{name:'Coverage & list view'}).click();await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
+ await page.goto('/agents');await expect(page.getByRole('heading',{name:'Meet your food crew.'})).toBeVisible();await expect(page.getByRole('heading',{name:'Catalogue job queue'})).toBeVisible();
+ const response=await page.request.get('/api/agents/activity');expect(response.ok()).toBeTruthy();const data=await response.json();expect(data.agents.length).toBeGreaterThan(0);
+ expect(data.agents.every((run:{agent:string;latency_ms:number})=>typeof run.agent==='string'&&run.latency_ms>=0)).toBeTruthy();
+ await expect(page.getByRole('heading',{name:'Administrator quality review'})).toHaveCount(0);
+});

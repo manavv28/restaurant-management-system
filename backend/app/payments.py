@@ -7,9 +7,9 @@ import re
 import uuid
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Request
-from sqlalchemy import select
+from sqlalchemy import select,func
 from sqlalchemy.exc import IntegrityError
-from .database import PaymentOrder, Restaurant, Transaction, User, PaymentAdjustment
+from .database import PaymentOrder, Restaurant, Transaction, User, PaymentAdjustment, Campaign, Redemption, DealVoucher
 from .schemas import TransactionInput
 from .security import current_user, verified_user, db_session
 
@@ -25,18 +25,47 @@ async def create_order(body:TransactionInput,user=Depends(verified_user),db=Depe
     if str(restaurant.id) not in approved:raise HTTPException(503,'Restaurant payment onboarding is incomplete')
     key,secret=os.getenv('RAZORPAY_KEY_ID'),os.getenv('RAZORPAY_KEY_SECRET')
     if not key or not secret or not os.getenv('RAZORPAY_WEBHOOK_SECRET'):raise HTTPException(503,'Payment provider is not configured')
+    if not key.startswith('rzp_test_'):raise HTTPException(503,'This MVP supports Razorpay test mode only; live charges are disabled')
+    requested_amount=body.amount_paise;discount=0
+    def deal_quote():
+        from .main import eligibility
+        campaign=db.get(Campaign,body.campaign_id)
+        if not campaign or campaign.restaurant_id!=restaurant.id:raise HTTPException(422,'Offer does not belong to this restaurant')
+        check=eligibility(db,user,campaign)
+        if not check['eligible']:raise HTTPException(403,'; '.join(check['reasons']))
+        if body.amount_paise<campaign.min_order_paise:raise HTTPException(422,'Minimum order value not reached')
+        limits=check['policy_limits']
+        benefit=limits['flat_discount_paise'] if limits and limits['flat_discount_paise'] else body.amount_paise*campaign.percent//100
+        value=min(benefit,campaign.max_discount_paise,body.amount_paise)
+        if limits and value>limits['remaining_paise']:raise HTTPException(409,'Restaurant daily discount budget cannot cover this offer')
+        return campaign,check,value
+    if body.campaign_id:
+        _,_,discount=deal_quote();requested_amount=body.amount_paise-discount
+        if requested_amount<100:raise HTTPException(422,'Discounted test payment must be at least ₹1')
+    db.commit()
     try:
         async with httpx.AsyncClient(timeout=20) as client:
             response=await client.post('https://api.razorpay.com/v1/orders',auth=(key,secret),
-                json={'amount':body.amount_paise,'currency':'INR','receipt':uuid.uuid4().hex})
+                json={'amount':requested_amount,'currency':'INR','receipt':uuid.uuid4().hex})
             response.raise_for_status();data=response.json()
         identifier=data['id']
-        if not isinstance(identifier,str) or not re.fullmatch(r'order_[A-Za-z0-9]{1,80}',identifier) or type(data['amount']) is not int or data['amount']!=body.amount_paise or data['currency']!='INR':raise ValueError()
+        if not isinstance(identifier,str) or not re.fullmatch(r'order_[A-Za-z0-9]{1,80}',identifier) or type(data['amount']) is not int or data['amount']!=requested_amount or data['currency']!='INR':raise ValueError()
     except (httpx.HTTPError,ValueError,KeyError,TypeError):
         raise HTTPException(502,'Payment provider could not create a validated order')
-    order=PaymentOrder(provider_order_id=identifier,user_id=user.id,restaurant_id=restaurant.id,amount_paise=body.amount_paise)
-    db.add(order);db.commit()
-    return {'order_id':identifier,'key_id':key,'amount_paise':body.amount_paise,'currency':'INR',
+    user=db.scalar(select(User).where(User.id==user.id).with_for_update().execution_options(populate_existing=True))
+    if not user or not user.consent:raise HTTPException(409,'Consent changed during checkout; no usable order was issued')
+    if body.campaign_id:db.scalar(select(Restaurant).where(Restaurant.id==restaurant.id).with_for_update())
+    order=PaymentOrder(provider_order_id=identifier,user_id=user.id,restaurant_id=restaurant.id,amount_paise=requested_amount,test_mode=True)
+    db.add(order);db.flush()
+    if body.campaign_id:
+        # All reservations for a restaurant serialize on this row, across different campaigns/users.
+        campaign,check,current_discount=deal_quote()
+        if current_discount!=discount:raise HTTPException(409,'Offer changed during checkout; please retry')
+        reservation=Redemption(user_id=user.id,campaign_id=campaign.id,sequence=(db.scalar(select(func.max(Redemption.sequence)).where(Redemption.user_id==user.id,Redemption.campaign_id==campaign.id)) or 0)+1,order_paise=body.amount_paise,discount_paise=discount,audit=json.dumps({'kind':'pending_test_voucher','eligibility':check}));db.add(reservation);db.flush()
+        from datetime import datetime,timedelta,timezone
+        db.add(DealVoucher(id=uuid.uuid4().hex,payment_order_id=order.id,redemption_id=reservation.id,expires_at=(datetime.now(timezone.utc)+timedelta(minutes=15)).isoformat()))
+    db.commit()
+    return {'order_id':identifier,'key_id':key,'amount_paise':requested_amount,'currency':'INR','test_mode':True,'discount_paise':discount,
             'notice':'Use the provider hosted checkout. Only a signed payment.captured webhook verifies spending. No UPI PIN, password or OTP is handled by BiteAI.'}
 
 @router.post('/webhook')
@@ -65,6 +94,10 @@ async def captured(request:Request,db=Depends(db_session)):
     except (ValueError,TypeError,KeyError):raise HTTPException(400,'Invalid capture event')
     order=db.scalar(select(PaymentOrder).where(PaymentOrder.provider_order_id==order_id).with_for_update())
     if not order:raise HTTPException(409,'Unknown provider order; manual reconciliation required')
+    if order.state=='cancelled':raise HTTPException(409,'Cancelled checkout; provider reconciliation required')
+    pending_voucher=db.scalar(select(DealVoucher).where(DealVoucher.payment_order_id==order.id))
+    from .database import now
+    if pending_voucher and pending_voucher.state=='pending' and pending_voucher.expires_at<=now():raise HTTPException(409,'Voucher reservation expired; provider reconciliation required')
     if amount!=order.amount_paise:raise HTTPException(409,'Amount mismatch')
     reference='razorpay:'+payment_id
     existing=db.scalar(select(Transaction).where(Transaction.reference==reference))
@@ -74,8 +107,12 @@ async def captured(request:Request,db=Depends(db_session)):
     if existing:raise HTTPException(409,'Payment reference already assigned; reconciliation required')
     user=db.scalar(select(User).where(User.id==order.user_id).with_for_update().execution_options(populate_existing=True))
     if not user or not user.consent:raise HTTPException(409,'Consent withdrawn; manual provider reconciliation required')
-    db.add(Transaction(user_id=order.user_id,restaurant_id=order.restaurant_id,reference=reference,amount_paise=amount,simulated=False))
+    db.add(Transaction(user_id=order.user_id,restaurant_id=order.restaurant_id,reference=reference,amount_paise=amount,simulated=False,test_mode=order.test_mode,provider_order_id=order.provider_order_id))
     order.state='captured'
+    voucher=db.scalar(select(DealVoucher).where(DealVoucher.payment_order_id==order.id))
+    if voucher and voucher.state=='pending':
+        from datetime import datetime,timedelta,timezone
+        voucher.state='issued';voucher.expires_at=(datetime.now(timezone.utc)+timedelta(hours=24)).isoformat()
     try:db.commit()
     except IntegrityError:
         db.rollback();return {'status':'duplicate'}
@@ -86,7 +123,7 @@ async def captured(request:Request,db=Depends(db_session)):
 def order_status(order_id:str,user=Depends(current_user),db=Depends(db_session)):
     order=db.scalar(select(PaymentOrder).where(PaymentOrder.provider_order_id==order_id,PaymentOrder.user_id==user.id))
     if not order:raise HTTPException(404,'Order not found')
-    return {'order_id':order.provider_order_id,'state':order.state,'amount_paise':order.amount_paise,'restaurant_id':order.restaurant_id,
+    return {'order_id':order.provider_order_id,'state':order.state,'amount_paise':order.amount_paise,'restaurant_id':order.restaurant_id,'test_mode':order.test_mode,
             'notice':'Only a signed captured webhook credits verified spending.'}
 
 
@@ -95,7 +132,7 @@ def availability(rid:int,db=Depends(db_session)):
     restaurant=db.get(Restaurant,rid)
     approved={v.strip() for v in os.getenv('RAZORPAY_RESTAURANT_IDS','').split(',')}
     configured=all(os.getenv(key) for key in ('RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET'))
-    return {'enabled':bool(configured and restaurant and not restaurant.sample and str(rid) in approved and (os.getenv('APP_ENV')!='production' or restaurant.ownership_verified))}
+    return {'test_mode':True,'enabled':bool(configured and os.getenv('RAZORPAY_KEY_ID','').startswith('rzp_test_') and restaurant and not restaurant.sample and str(rid) in approved and (os.getenv('APP_ENV')!='production' or restaurant.ownership_verified))}
 
 
 
@@ -110,7 +147,9 @@ def adjust_payment(payload,db):
         timestamp=payload.get('created_at',0)
         if not refund and (type(timestamp) is not int or timestamp<=0):raise ValueError()
     except (KeyError,TypeError,ValueError):raise HTTPException(400,'Invalid payment adjustment') from None
-    transaction=db.scalar(select(Transaction).where(Transaction.reference=='razorpay:'+payment_id,Transaction.simulated.is_(False)).with_for_update())
+    existing=db.scalar(select(Transaction).where(Transaction.reference=='razorpay:'+payment_id,Transaction.simulated.is_(False)))
+    if existing and existing.provider_order_id:db.scalar(select(PaymentOrder).where(PaymentOrder.provider_order_id==existing.provider_order_id).with_for_update())
+    transaction=db.scalar(select(Transaction).where(Transaction.reference=='razorpay:'+payment_id,Transaction.simulated.is_(False)).with_for_update().execution_options(populate_existing=True))
     if not transaction:raise HTTPException(409,'Unknown payment; provider reconciliation required')
     reference=('refund:'+identifier) if refund else ('dispute:'+identifier+':'+event+':'+str(timestamp))
     previous=db.scalar(select(PaymentAdjustment).where(PaymentAdjustment.reference==reference))
@@ -123,5 +162,20 @@ def adjust_payment(payload,db):
         transaction.refunded_paise+=amount
     elif timestamp>transaction.dispute_updated_at:
         transaction.disputed=event!='payment.dispute.won';transaction.dispute_updated_at=timestamp
+    if transaction.provider_order_id and (refund or transaction.disputed):
+        voucher=db.scalar(select(DealVoucher).join(PaymentOrder).where(PaymentOrder.provider_order_id==transaction.provider_order_id))
+        if voucher:voucher.state='revoked'
     db.add(PaymentAdjustment(transaction_id=transaction.id,reference=reference,kind=event,amount_paise=amount));db.commit()
     return {'status':'adjusted','refunded_paise':transaction.refunded_paise,'disputed':transaction.disputed}
+
+
+@router.post('/orders/{order_id}/cancel')
+def cancel_order(order_id:str,user=Depends(current_user),db=Depends(db_session)):
+    order=db.scalar(select(PaymentOrder).where(PaymentOrder.provider_order_id==order_id,PaymentOrder.user_id==user.id).with_for_update())
+    if not order:raise HTTPException(404,'Order not found')
+    if order.state!='created':raise HTTPException(409,'Only an unpaid checkout can be cancelled')
+    order.state='cancelled'
+    voucher=db.scalar(select(DealVoucher).where(DealVoucher.payment_order_id==order.id))
+    if voucher:voucher.state='cancelled'
+    db.commit()
+    return {'state':'cancelled','notice':'Local unpaid reservation released. Any later provider capture requires reconciliation.'}

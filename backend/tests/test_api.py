@@ -71,7 +71,7 @@ def test_consent_and_simulation_never_verified(client):
 def test_discount_cap_audit_limit_and_minimum(client):
     h=account(client)
     assert client.post('/campaigns/1/redeem',headers=h,json={'order_paise':30000}).status_code==403
-    for _ in range(5): assert client.post('/search',headers=h,json={'query':'Chinese'}).status_code==200
+    for query in ['Chinese','hakka noodles','pizza','dosa','biryani']: assert client.post('/search',headers=h,json={'query':query}).status_code==200
     assert client.get('/me/offers',headers=h).json()[0]['eligible']
     assert client.post('/campaigns/1/redeem',headers=h,json={'order_paise':1000}).status_code==422
     r=client.post('/campaigns/1/redeem',headers=h,json={'order_paise':999999})

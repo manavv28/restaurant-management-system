@@ -149,3 +149,10 @@ def test_undated_or_old_secondary_prices_require_review():
     with pytest.raises(ValueError,match='older than 90 days'):prepare_snapshot(raw)
     raw=snapshot();raw['menu']['currency']='USD'
     with pytest.raises(ValueError,match='currency'):prepare_snapshot(raw)
+
+
+def test_dietary_fact_requires_explicit_boolean_and_conflicts_remain_unknown():
+    raw=snapshot();raw['menu']['sections'][0]['items']=[{'name':'Declared vegetarian','price':199,'veg':True},{'name':'Unknown','price':100},{'name':'Not vegetarian','price':150,'veg':False},{'name':'String flag','price':90,'veg':'true'},{'name':'Conflicting','price':110,'veg':True},{'name':'Conflicting','price':110,'veg':False}]
+    items={row['name']:row for row in prepare_snapshot(raw)['items']}
+    assert items['Declared vegetarian']['dietary']=='vegetarian'
+    assert all(items[name]['dietary'] is None for name in ['Unknown','Not vegetarian','String flag','Conflicting'])

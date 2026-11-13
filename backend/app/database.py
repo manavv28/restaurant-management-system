@@ -83,6 +83,7 @@ class MenuItem(Base):
     available: Mapped[bool] = mapped_column(Boolean, default=True)
     source: Mapped[str] = mapped_column(Text, default='Owner supplied; unverified')
     verified_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    dietary: Mapped[str | None] = mapped_column(String(20),nullable=True)
 class Search(Base):
     __tablename__ = 'searches'
     id: Mapped[int] = mapped_column(primary_key=True)
@@ -124,6 +125,8 @@ class Transaction(Base):
     reference: Mapped[str] = mapped_column(String(100), unique=True)
     amount_paise: Mapped[int] = mapped_column(Integer)
     simulated: Mapped[bool] = mapped_column(Boolean, default=True)
+    test_mode: Mapped[bool] = mapped_column(Boolean,default=False,server_default=text('false'))
+    provider_order_id: Mapped[str | None] = mapped_column(String(100),nullable=True,index=True)
     refunded_paise: Mapped[int] = mapped_column(Integer, default=0, server_default=text('0'))
     disputed: Mapped[bool] = mapped_column(Boolean, default=False, server_default=text('false'))
     dispute_updated_at: Mapped[int] = mapped_column(Integer, default=0, server_default=text('0'))
@@ -223,6 +226,7 @@ class PaymentOrder(Base):
     restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'))
     amount_paise: Mapped[int] = mapped_column(Integer)
     state: Mapped[str] = mapped_column(String(20), default='created')
+    test_mode: Mapped[bool] = mapped_column(Boolean,default=False,server_default=text('false'))
     created_at: Mapped[str] = mapped_column(String(40), default=now)
 
 from sqlalchemy import Index, text
@@ -282,3 +286,60 @@ class CatalogIdentity(Base):
     licence: Mapped[str] = mapped_column(Text)
     observed_at: Mapped[str] = mapped_column(String(40))
     details: Mapped[str] = mapped_column(Text, default='{}')
+
+
+class CampaignPolicy(Base):
+    __tablename__ = 'campaign_policies'
+    campaign_id: Mapped[int] = mapped_column(ForeignKey('campaigns.id',ondelete='CASCADE'),primary_key=True)
+    min_tier: Mapped[str] = mapped_column(String(20),default='Bronze')
+    cuisine: Mapped[str] = mapped_column(String(100),default='')
+    cuisine_queries_30d: Mapped[int] = mapped_column(Integer,default=0)
+    daily_budget_paise: Mapped[int] = mapped_column(Integer,default=200000)
+    flat_discount_paise: Mapped[int] = mapped_column(Integer,default=0)
+
+class AgentRun(Base):
+    __tablename__ = 'agent_runs'
+    id: Mapped[str] = mapped_column(String(64),primary_key=True)
+    agent: Mapped[str] = mapped_column(String(30),index=True)
+    status: Mapped[str] = mapped_column(String(20))
+    search_id: Mapped[int | None] = mapped_column(ForeignKey('searches.id',ondelete='SET NULL'),nullable=True,index=True)
+    summary: Mapped[str] = mapped_column(Text)
+    latency_ms: Mapped[int] = mapped_column(Integer)
+    cost_microrupees: Mapped[int | None] = mapped_column(Integer,nullable=True)
+    created_at: Mapped[str] = mapped_column(String(40),default=now,index=True)
+
+class ResearchRequest(Base):
+    __tablename__ = 'research_requests'
+    id: Mapped[str] = mapped_column(String(64),primary_key=True)
+    search_id: Mapped[int | None] = mapped_column(ForeignKey('searches.id',ondelete='SET NULL'),nullable=True,index=True)
+    job_ids: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String(40),default=now,index=True)
+
+class BronzeArtifact(Base):
+    __tablename__ = 'bronze_artifacts'
+    id: Mapped[str] = mapped_column(String(64),primary_key=True)
+    source_id: Mapped[int] = mapped_column(ForeignKey('catalog_sources.id'),index=True)
+    content_hash: Mapped[str] = mapped_column(String(64))
+    content: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[str] = mapped_column(String(40),default=now,index=True)
+
+
+class DealVoucher(Base):
+    __tablename__ = 'deal_vouchers'
+    id: Mapped[str] = mapped_column(String(64),primary_key=True)
+    payment_order_id: Mapped[int] = mapped_column(ForeignKey('payment_orders.id'),unique=True)
+    redemption_id: Mapped[int] = mapped_column(ForeignKey('redemptions.id'),unique=True)
+    state: Mapped[str] = mapped_column(String(20),default='pending')
+    expires_at: Mapped[str] = mapped_column(String(40),index=True)
+    redeemed_at: Mapped[str | None] = mapped_column(String(40),nullable=True)
+
+class RestaurantClaim(Base):
+    __tablename__ = 'restaurant_claims'
+    id: Mapped[str] = mapped_column(String(64),primary_key=True)
+    restaurant_id: Mapped[int] = mapped_column(ForeignKey('restaurants.id'),index=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey('users.id'),index=True)
+    business_reference: Mapped[str] = mapped_column(String(40))
+    state: Mapped[str] = mapped_column(String(20),default='pending')
+    review_note: Mapped[str] = mapped_column(Text,default='')
+    reviewed_by: Mapped[int | None] = mapped_column(ForeignKey('users.id'),nullable=True)
+    created_at: Mapped[str] = mapped_column(String(40),default=now)

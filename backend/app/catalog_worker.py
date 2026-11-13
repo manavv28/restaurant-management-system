@@ -33,7 +33,7 @@ def schedule(db):
         except IntegrityError:db.rollback()
     db.commit();return queued
 
-async def run_one():
+async def run_one(job_id=None):
     with Session() as db:
         # Recover leases after a worker crash. Three attempts max.
         stale=(datetime.now(timezone.utc)-timedelta(minutes=10)).isoformat()
@@ -41,7 +41,7 @@ async def run_one():
             row.state='queued' if row.attempts<3 else 'failed';row.error='Worker lease expired'
             if row.state=='failed':row.finished_at=now()
         db.commit()
-        candidates=db.scalars(select(CatalogJob).where(CatalogJob.state=='queued',CatalogJob.available_at<=now()).order_by(CatalogJob.id).limit(20)).all()
+        candidates=db.scalars(select(CatalogJob).where(CatalogJob.state=='queued',CatalogJob.available_at<=now()).where(CatalogJob.id==job_id if job_id else True).order_by(CatalogJob.id).limit(20)).all()
         job=None
         for candidate in candidates:
             claimed=db.execute(update(CatalogJob).where(CatalogJob.id==candidate.id,CatalogJob.state=='queued').values(state='running',started_at=now(),attempts=CatalogJob.attempts+1))
@@ -50,6 +50,7 @@ async def run_one():
         if not job:return None
         source=db.get(CatalogSource,job.source_id)
         trace=[];job_id=job.id
+        db.commit()
         try:
             if not source or not source.enabled:raise ValueError('Source disabled')
             if source.kind=='osm':
@@ -66,11 +67,14 @@ async def run_one():
                 restaurant=db.get(Restaurant,source.restaurant_id)
                 if not restaurant or restaurant.owner_id is not None:
                     source.enabled=False;db.commit();raise ValueError('Owner-managed public API source disabled')
+                db.commit()
                 snapshot=await fetch_snapshot(source,identity)
                 result=persist_snapshots(db,[snapshot])
                 trace.append({'agent':'Public menu API','tool':'attributed_INR_price_facts','output':result})
             elif source.kind=='approved_menu':
                 html=await fetch_menu(source);observed_url=source.url
+                from .saarthi import save_bronze
+                save_bronze(db,source.id,html);db.commit()
                 trace.append({'agent':'Collection','tool':'approved_https_and_robots','bytes':len(html.encode())})
                 items,text=structured_menu(html)
                 method=items[0].get('method','schema.org') if items else 'no structured prices'
@@ -82,6 +86,7 @@ async def run_one():
                         candidate_items,candidate_text=structured_menu(candidate_html)
                         if candidate_items:
                             html=candidate_html;items=candidate_items;text=candidate_text;observed_url=candidate
+                            save_bronze(db,source.id,html);db.commit()
                             method=items[0].get('method','schema.org')
                             trace.append({'agent':'Source discovery','tool':'approved_menu_link','url':candidate})
                             break

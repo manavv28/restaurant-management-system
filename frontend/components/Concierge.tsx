@@ -1,0 +1,29 @@
+'use client';
+import {useEffect,useRef,useState} from 'react';
+import {ArrowRight,CheckCircle2,LoaderCircle,Moon,Sun,Volume2,VolumeX,Activity,MapPin} from 'lucide-react';
+import {apiRequest,type QueryStep} from '../shared/api';
+export type Verdict={alternatives?:{restaurant_id:number;restaurant_name:string;dish_name:string;price_paise:number;distance_km:number;price_status:string}[];headline:string;match_count:number;explanation:string;party_notice:string|null;mode_notice:string;follow_ups:string[]};
+export type Rewards={tier:string;points:number;meaningful_queries_30d:number;verified_spend_30d_paise:number;sandbox_spend_30d_paise?:number;sandbox_points?:number;next_tier:string|null;next_threshold:number|null;rule:string};
+export type Research={state:string;token?:string;message:string};
+export function AgentTrace({steps,loading}:{steps:QueryStep[];loading:boolean}){
+ if(!steps.length)return null;
+ return <section className="live-agent-trace" aria-label="Live agent trace" aria-live="polite"><div className="eyebrow"><Activity size={15}/>YOUR CONCIERGE AT WORK</div><ol>{steps.map((step,i)=><li key={step.event+i}>{loading&&i===steps.length-1?<LoaderCircle size={16} className="spin"/>:<CheckCircle2 size={16}/>}<span><b>{step.agent||'Saarthi'}</b> {step.message||step.event.replaceAll('_',' ')}{typeof step.matches==='number'&&<small>{step.matches} matching restaurants</small>}</span></li>)}</ol></section>;
+}
+export function VerdictCard({value,onFollowUp,onExplore}:{value:Verdict;onFollowUp:(text:string)=>void;onExplore:()=>void}){
+ return <section className="verdict-card" aria-label="Your food verdict"><div className="eyebrow">YOUR CRAVING. A CLEAR ANSWER.</div><h2>{value.headline}</h2><p>{value.explanation}</p>{value.party_notice&&<p className="verdict-caution">{value.party_notice}</p>}<small>{value.mode_notice}</small>{!!value.alternatives?.length&&<div className="verdict-alternatives"><h3>Above your budget · reference prices</h3>{value.alternatives.map(row=><p key={row.restaurant_id}><strong>{row.dish_name} · ₹{row.price_paise/100}</strong><br/>{row.restaurant_name} · {row.distance_km} km<small>{row.price_status}</small></p>)}</div>}<div className="verdict-actions">{value.follow_ups.map(text=><button className="secondary" key={text} onClick={()=>onFollowUp(text)}>{text}</button>)}{value.match_count>0&&<button className="primary" onClick={onExplore}>Explore your matches <ArrowRight size={16}/></button>}</div></section>;
+}
+export function TierCard({value}:{value:Rewards}){
+ const previous=useRef(value.tier);const [up,setUp]=useState(false);
+ useEffect(()=>{if(previous.current!==value.tier){setUp(true);previous.current=value.tier;const timer=setTimeout(()=>setUp(false),4000);return()=>clearTimeout(timer)}},[value.tier]);
+ const progress=value.next_threshold?Math.min(100,value.points/value.next_threshold*100):100;
+ return <section className={'panel tier-card '+(up?'tier-unlocked':'')} aria-label="Your rewards tier"><div className="tier-ring" style={{background:`conic-gradient(var(--orange) ${progress}%, var(--line) 0)`}}><span>{value.points}<small>points</small></span></div><div><div className="eyebrow">YOUR APPETITE, REWARDED</div><h2>{value.tier}{up?' · Tier updated':''}</h2><p>{value.meaningful_queries_30d} meaningful queries in 30 days{value.next_tier?' · '+Math.max(0,(value.next_threshold||0)-value.points)+' points to '+value.next_tier:''}</p><small>{value.rule}</small>{!!value.sandbox_spend_30d_paise&&<p>Sandbox payment activity: ₹{value.sandbox_spend_30d_paise/100}. No real money moved; this does not count as verified real spending.</p>}</div></section>;
+}
+export function ExperienceControls(){
+ const [night,setNight]=useState(true),[sound,setSound]=useState(false);
+ useEffect(()=>{try{const saved=localStorage.getItem('biteai-theme');const enabled=saved!=='light';setNight(enabled);document.documentElement.dataset.theme=enabled?'night':'light';setSound(localStorage.getItem('biteai-sound')==='true')}catch{}if('serviceWorker' in navigator&&process.env.NODE_ENV==='production')void navigator.serviceWorker.register('/sw.js').catch(()=>{});},[]);
+ return <div className="experience-controls"><button type="button" aria-label={night?'Switch to light theme':'Switch to dark theme'} onClick={()=>{const value=!night;setNight(value);document.documentElement.dataset.theme=value?'night':'light';try{localStorage.setItem('biteai-theme',value?'night':'light')}catch{}}}>{night?<Sun size={17}/>:<Moon size={17}/>}</button><button type="button" aria-label={sound?'Mute interface sounds':'Enable interface sounds'} aria-pressed={sound} onClick={()=>{const value=!sound;setSound(value);try{localStorage.setItem('biteai-sound',String(value))}catch{}}}>{sound?<Volume2 size={17}/>:<VolumeX size={17}/>}</button><a className="map-experience-link" href="/concierge" aria-label="Open immersive map"><MapPin size={17}/></a><a className="agent-wall-link" href="/agents">Agent Wall</a></div>;
+}
+export function feedback(){
+ if(typeof navigator!=='undefined'&&navigator.vibrate)navigator.vibrate(15);
+ try{if(localStorage.getItem('biteai-sound')!=='true')return;const audio=new AudioContext();const oscillator=audio.createOscillator(),gain=audio.createGain();oscillator.connect(gain);gain.connect(audio.destination);gain.gain.setValueAtTime(.025,audio.currentTime);gain.gain.exponentialRampToValueAtTime(.001,audio.currentTime+.08);oscillator.frequency.value=520;oscillator.start();oscillator.stop(audio.currentTime+.08);oscillator.onended=()=>void audio.close()}catch{}
+}

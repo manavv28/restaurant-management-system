@@ -1,0 +1,1 @@
+export default function Offline(){return <main className="workspace"><h1>You’re offline.</h1><p>BiteAI needs a connection to check the current catalogue. Account pages and private data are never saved for offline browsing.</p><a className="primary" href="/">Try again</a></main>}

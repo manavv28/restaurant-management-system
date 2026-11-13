@@ -1,0 +1,2 @@
+import type {MetadataRoute} from 'next';
+export default function manifest():MetadataRoute.Manifest{return {name:'BiteAI · Mumbai food concierge',short_name:'BiteAI',description:'Ask for a dish, a budget and a neighbourhood. Explore source-listed Mumbai menus.',start_url:'/concierge',display:'standalone',background_color:'#101b18',theme_color:'#101b18',icons:[{src:'/biteai-icon.svg',sizes:'any',type:'image/svg+xml',purpose:'any'}]};}
