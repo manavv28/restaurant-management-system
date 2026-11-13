@@ -118,7 +118,7 @@ def menu_search(db, intent, lat, lng, include_samples=True):
     if intent.cuisine and dish_cuisines.get((intent.dish or '').casefold())!=intent.cuisine:
         query=query.where(or_(Restaurant.cuisine.icontains(intent.cuisine,autoescape=True),MenuItem.cuisine.icontains(intent.cuisine,autoescape=True)))
     name=func.lower(MenuItem.name)
-    for punctuation in ('-','(',')','.',',',':','&'):
+    for punctuation in ('-','(',')','.',',',':','&','+','/','[',']','|','_','–','—','\u00a0'):
         name=func.replace(name,punctuation,' ')
     padded=' '+name+' '
     if intent.dish:
