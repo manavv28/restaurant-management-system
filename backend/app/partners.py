@@ -39,6 +39,7 @@ class Decision(BaseModel):
 def decide(cid:str,body:Decision,user=Depends(admin),db=Depends(db_session)):
     claim=db.scalar(select(RestaurantClaim).where(RestaurantClaim.id==cid).with_for_update())
     if not claim or claim.state!='pending':raise HTTPException(409,'Claim is no longer pending')
+    db.scalar(select(User).where(User.id==claim.user_id).with_for_update())
     restaurant=db.scalar(select(Restaurant).where(Restaurant.id==claim.restaurant_id).with_for_update())
     if body.decision=='approve':
         if not body.business_checked or not body.contact_checked:raise HTTPException(422,'Independent business and public-contact checks are required')

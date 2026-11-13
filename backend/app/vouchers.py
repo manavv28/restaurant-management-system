@@ -14,8 +14,9 @@ def voucher_token(row):
 
 def details(db,row):
     order=db.get(PaymentOrder,row.payment_order_id);redemption=db.get(Redemption,row.redemption_id);restaurant=db.get(Restaurant,order.restaurant_id)
-    return {'id':row.id,'restaurant_name':restaurant.name,'state':row.state,'expires_at':row.expires_at,'redeemed_at':row.redeemed_at,'amount_paise':order.amount_paise,'discount_paise':redemption.discount_paise,'test_mode':order.test_mode,
-            'code':voucher_token(row) if row.state=='issued' else None,'notice':'Test-mode deal voucher; no real money moved.' if order.test_mode else 'Provider-verified deal voucher'}
+    state='expired' if row.state in ('pending','issued') and row.expires_at<=now() else row.state
+    return {'id':row.id,'restaurant_name':restaurant.name,'state':state,'expires_at':row.expires_at,'redeemed_at':row.redeemed_at,'amount_paise':order.amount_paise,'discount_paise':redemption.discount_paise,'test_mode':order.test_mode,
+            'code':voucher_token(row) if state=='issued' else None,'notice':'Test-mode deal voucher; no real money moved.' if order.test_mode else 'Provider-verified deal voucher'}
 
 @router.get('/me/vouchers')
 def mine(user=Depends(current_user),db=Depends(db_session)):
@@ -36,11 +37,12 @@ class Scan(BaseModel):
 def redeem(body:Scan,user=Depends(owner),db=Depends(db_session)):
     try:claims=jwt.decode(body.code.strip(),SECRET,algorithms=['HS256'],audience='biteai-voucher',options={'require':['exp','vid']})
     except jwt.PyJWTError:raise HTTPException(400,'Voucher code is invalid or expired') from None
-    row=db.scalar(select(DealVoucher).where(DealVoucher.id==claims['vid']).with_for_update())
+    row=db.get(DealVoucher,claims['vid'])
     if not row:raise HTTPException(404,'Voucher not found')
-    order=db.get(PaymentOrder,row.payment_order_id);restaurant=db.get(Restaurant,order.restaurant_id)
+    order=db.scalar(select(PaymentOrder).where(PaymentOrder.id==row.payment_order_id).with_for_update());restaurant=db.get(Restaurant,order.restaurant_id)
     if restaurant.owner_id!=user.id:raise HTTPException(403,'This voucher belongs to another restaurant')
-    transaction=db.scalar(select(Transaction).where(Transaction.provider_order_id==order.provider_order_id))
+    transaction=db.scalar(select(Transaction).where(Transaction.provider_order_id==order.provider_order_id).with_for_update().execution_options(populate_existing=True))
+    row=db.scalar(select(DealVoucher).where(DealVoucher.id==row.id).with_for_update().execution_options(populate_existing=True))
     if not transaction or transaction.disputed or transaction.refunded_paise or order.state!='captured':raise HTTPException(409,'Payment is not eligible for voucher redemption')
     if row.state!='issued' or row.expires_at<=now():raise HTTPException(409,'Voucher is not active or has already been redeemed')
     row.state='redeemed';row.redeemed_at=now();db.commit()

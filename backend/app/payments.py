@@ -54,11 +54,11 @@ async def create_order(body:TransactionInput,user=Depends(verified_user),db=Depe
         raise HTTPException(502,'Payment provider could not create a validated order')
     user=db.scalar(select(User).where(User.id==user.id).with_for_update().execution_options(populate_existing=True))
     if not user or not user.consent:raise HTTPException(409,'Consent changed during checkout; no usable order was issued')
+    if body.campaign_id:db.scalar(select(Restaurant).where(Restaurant.id==restaurant.id).with_for_update())
     order=PaymentOrder(provider_order_id=identifier,user_id=user.id,restaurant_id=restaurant.id,amount_paise=requested_amount,test_mode=True)
     db.add(order);db.flush()
     if body.campaign_id:
         # All reservations for a restaurant serialize on this row, across different campaigns/users.
-        db.scalar(select(Restaurant).where(Restaurant.id==restaurant.id).with_for_update())
         campaign,check,current_discount=deal_quote()
         if current_discount!=discount:raise HTTPException(409,'Offer changed during checkout; please retry')
         reservation=Redemption(user_id=user.id,campaign_id=campaign.id,sequence=(db.scalar(select(func.max(Redemption.sequence)).where(Redemption.user_id==user.id,Redemption.campaign_id==campaign.id)) or 0)+1,order_paise=body.amount_paise,discount_paise=discount,audit=json.dumps({'kind':'pending_test_voucher','eligibility':check}));db.add(reservation);db.flush()
@@ -147,7 +147,9 @@ def adjust_payment(payload,db):
         timestamp=payload.get('created_at',0)
         if not refund and (type(timestamp) is not int or timestamp<=0):raise ValueError()
     except (KeyError,TypeError,ValueError):raise HTTPException(400,'Invalid payment adjustment') from None
-    transaction=db.scalar(select(Transaction).where(Transaction.reference=='razorpay:'+payment_id,Transaction.simulated.is_(False)).with_for_update())
+    existing=db.scalar(select(Transaction).where(Transaction.reference=='razorpay:'+payment_id,Transaction.simulated.is_(False)))
+    if existing and existing.provider_order_id:db.scalar(select(PaymentOrder).where(PaymentOrder.provider_order_id==existing.provider_order_id).with_for_update())
+    transaction=db.scalar(select(Transaction).where(Transaction.reference=='razorpay:'+payment_id,Transaction.simulated.is_(False)).with_for_update().execution_options(populate_existing=True))
     if not transaction:raise HTTPException(409,'Unknown payment; provider reconciliation required')
     reference=('refund:'+identifier) if refund else ('dispute:'+identifier+':'+event+':'+str(timestamp))
     previous=db.scalar(select(PaymentAdjustment).where(PaymentAdjustment.reference==reference))

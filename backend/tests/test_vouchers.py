@@ -66,3 +66,33 @@ def test_live_keys_cannot_enable_real_charges(client,monkeypatch):
     monkeypatch.setenv('RAZORPAY_KEY_ID','rzp_live_not_authorized')
     assert not client.get('/payments/availability/'+str(rid)).json()['enabled']
     assert client.post('/payments/orders',headers=buyer,json={'restaurant_id':rid,'amount_paise':30000}).status_code==503
+
+
+def test_concurrent_buyers_cannot_overspend_the_restaurant_budget(client,monkeypatch):
+    from app.database import engine
+    if engine.dialect.name!='postgresql':
+        import pytest
+        pytest.skip('PostgreSQL row locks required')
+    from concurrent.futures import ThreadPoolExecutor
+    from threading import Barrier,Lock
+    from fastapi.testclient import TestClient
+    from app.main import app
+    first,merchant,rid,cid=setup(client,monkeypatch,budget=3000)
+    second=account(client,'second-voucher-buyer@example.test');client.put('/me/consent',headers=second,json={'consent':True})
+    # Separate ASGI portals exercise actual concurrent database transactions, not a serial mock.
+    barrier=Barrier(2);lock=Lock();counter=[0]
+    # setup replaced AsyncClient; retain the actual constructor from httpx's implementation module.
+    from httpx._client import AsyncClient
+    def handler(request):
+        with lock:counter[0]+=1;number=counter[0]
+        barrier.wait(timeout=10)
+        return httpx.Response(200,json={'id':'order_Concurrent'+str(number),'amount':27000,'currency':'INR'})
+    monkeypatch.setattr(httpx,'AsyncClient',lambda **kw:AsyncClient(transport=httpx.MockTransport(handler),**kw))
+    def buy(auth):
+        with TestClient(app) as independent:
+            return independent.post('/payments/orders',headers=auth,json={'restaurant_id':rid,'amount_paise':30000,'campaign_id':cid}).status_code
+    with ThreadPoolExecutor(max_workers=2) as workers:statuses=list(workers.map(buy,[first,second]))
+    assert sorted(statuses)==[200,403]
+    with Session() as db:
+        reserved=db.scalars(select(Redemption).where(Redemption.campaign_id==cid)).all()
+        assert sum(row.discount_paise for row in reserved)==3000
