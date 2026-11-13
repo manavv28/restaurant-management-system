@@ -7,6 +7,11 @@ from sqlalchemy import select,or_,and_,func
 from .database import Restaurant, MenuItem, MenuEvidence, now
 
 log = logging.getLogger('biteai.agents')
+PIZZA_SNACKS=('puff','puffs','mcpuff','pocket','pockets','sandwich','burger','fries','bread','stick','sticks',
+              'topping','toppings','samosa','samosas','finger','fingers','roll','rolls','wrap','wraps',
+              'momo','momos','frankie','nugget','nuggets','cutlet','cutlets','sauce','base','dip',
+              'chips','toast','toasties','bomb','bombs','ball','balls','bite','bites','paratha',
+              'uttapam','khakhra','nachos','rice','noodles','pasta')
 from .areas import AREAS
 class Intent(BaseModel):
     cuisine: str | None = Field(default=None,max_length=100)
@@ -40,7 +45,7 @@ def parse_local(query, budget=500, radius=5):
     cuisine = None
     cuisines = ['Chinese','Indian','Italian','Japanese','Mexican','South Indian']
     cuisine = next((c for c in reversed(cuisines) if c.lower() in q), None)
-    dishes = ['hakka noodles','noodles soup','pizza puff','pizza pocket','pizza sandwich','pizza burger','pizza mcpuff','pizza bread','pizza sticks','pizza stick','mcpuff','pasta salad','pasta soup',
+    dishes = ['hakka noodles','noodles soup',*[f'pizza {term}' for term in PIZZA_SNACKS],'mcpuff','pasta salad','pasta soup',
               'noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vadapav','vada pav',
               'coffee','tea','juice','ice cream','soup','salad']
     def negated(term):
@@ -126,11 +131,17 @@ def menu_search(db, intent, lat, lng, include_samples=True):
         aliases={'burger':['burger','cheeseburger'],'tacos':['tacos','taco']}.get(phrase,[phrase])
         query=query.where(or_(*(padded.contains(' '+alias+' ',autoescape=True) for alias in aliases)),~MenuItem.name.contains(' / '),~MenuItem.name.icontains(' or '))
         # Related snacks are not the requested dish. Explicit custom snack queries still work.
-        derivatives={'pizza':('puff','puffs','mcpuff','pocket','pockets','sandwich','burger','fries','bread','stick','sticks','topping','toppings'),
+        derivatives={'pizza':PIZZA_SNACKS,
                      'burger':('pizza','sandwich','fries'), 'noodles':('soup','samosa','spring roll'),
                      'hakka noodles':('soup','samosa','spring roll'),'pasta':('soup','salad','sandwich'),
                      'biryani':('arancini','samosa'),'dosa':('chips',)}
-        for term in derivatives.get(phrase,()):query=query.where(~padded.contains(' '+term+' ',autoescape=True))
+        terms=derivatives.get(phrase,())
+        if terms:
+            # Both PostgreSQL and SQLAlchemy's SQLite adapter support these word
+            # boundaries. One regex avoids repeating the normalization expression
+            # for every snack family and handles punctuation in combo names.
+            pattern=r'(?i)(?<!\w)(?:'+'|'.join(re.escape(term) for term in terms)+r')(?!\w)'
+            query=query.where(~MenuItem.name.regexp_match(pattern))
         if not phrase.startswith(('extra ','add on ','add-on ')):
             for prefix in ('extra ','add on ','add-on '):query=query.where(~func.lower(MenuItem.name).startswith(prefix,autoescape=True))
     for term in intent.excluded_dishes:
