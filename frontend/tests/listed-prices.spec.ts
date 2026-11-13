@@ -10,7 +10,7 @@ test('listed prices retain paise, original date, context and source link',async(
  await page.goto('/');
  await expect(page.getByRole('button',{name:'Synthetic price venue',exact:true})).toBeVisible();
  await expect(page.locator('.dish-row strong')).toHaveText('₹199.50');
- await expect(page.getByText('Listed price within budget',{exact:true})).toBeVisible();
+ await expect(page.getByText('Listed item price · total unconfirmed',{exact:true})).toBeVisible();
  await expect(page.locator('.catalog-numbers')).toContainText('123 source-listed dish prices');
  await expect(page.locator('.catalog-numbers')).toContainText('2 restaurants with listed prices');
  await page.getByRole('button',{name:'Synthetic price venue',exact:true}).click();

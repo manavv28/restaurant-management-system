@@ -30,16 +30,24 @@ def opening_status(hours,at=None):
 
 def continued_intent(query,intent,context):
     if not context:return intent
-    if not re.search(r'isme|inme|aur sasta|sabse paas|nearest|closest|veg (?:only|wale)|cheaper|same|these',query,re.I):return intent
+    if not re.search(r'isme|inme|aur sasta|sabse paas|nearest|closest|veg (?:only|wale)|cheaper|same|these|instead|ab |now in|only|total|delivery|dine|open now',query,re.I):return intent
     previous=Intent.model_validate(context)
     values=intent.model_dump();q=query.casefold()
     for field in ('dish','cuisine','location','diet'):
+        if field=='dish' and intent.cuisine and intent.cuisine!=previous.cuisine:continue
+        if field=='cuisine' and intent.dish and intent.dish!=previous.dish:continue
         if values[field] is None:values[field]=getattr(previous,field)
-    if not re.search(r'(?:under|below|budget|for|₹|rs\.?)\s*\d|\d+\s*(?:mein|tak|rupees)',q):values['max_budget']=previous.max_budget
+    if not re.search(r'(?:under|below|budget|total|for|₹|rs\.?)\s*\d|\d+\s*(?:mein|tak|rupees)',q):values['max_budget']=previous.max_budget
     if not re.search(r'\d+(?:\.\d+)?\s*(?:km|kilomet)',q):values['radius_km']=previous.radius_km
     if 'delivery' not in q and 'dine' not in q:values['mode']=previous.mode
     if intent.party_size==1:values['party_size']=previous.party_size
     if not intent.open_now:values['open_now']=previous.open_now
+    if not re.search(r'total|all[ -]in|per (?:item|person)',q):values['budget_scope']=previous.budget_scope
+    for field in ('excluded_dishes','excluded_cuisines'):
+        values[field]=list(dict.fromkeys([*getattr(previous,field),*values[field]]))[:10]
+    if values['dish'] and any(term in values['dish'].casefold() for term in values['excluded_dishes']):values['dish']=None
+    if values['cuisine'] in values['excluded_cuisines']:values['cuisine']=None
+    if previous.walking_requested:values['walking_requested']=True
     return Intent.model_validate(values)
 
 def confidence(dish,restaurant):
@@ -60,16 +68,28 @@ def verdict(data,intent):
     for row in rows:
         row['confidence']=confidence(row['dish'],row['restaurant'])
         row['opening']=opening_status(row['restaurant'].get('opening_hours'))
+        quantity=intent.party_size if intent.budget_scope=='total' else 1
+        subtotal=row['dish']['price_paise']*quantity
+        eligible=[o['discount_paise'] for o in row.get('offers',[]) if o.get('applies_to_item') and quantity==1]
+        discount=max(eligible,default=0)
+        row['budget_breakdown']={'quantity':quantity,'listed_unit_paise':row['dish']['price_paise'],
+            'listed_subtotal_paise':subtotal,'offer_preview_paise':discount,'subtotal_after_offer_paise':subtotal-discount,
+            'taxes_paise':None,'delivery_paise':None,'packaging_paise':None,'payable_total_paise':None,
+            'budget_paise':intent.max_budget*100,'status':'unconfirmed',
+            'notice':('Assumes one item per person; portions need confirmation. ' if quantity>1 else '')+'Taxes, packaging, delivery and current availability are unknown. Offers are previews; final total is unconfirmed.'}
         text=row['restaurant']['name']+' '+(intent.dish or intent.cuisine or '')+' Mumbai'
         row['platform_links']={'zomato':'https://www.zomato.com/mumbai/restaurants?'+urlencode({'q':text}),
                                'swiggy':'https://www.swiggy.com/search?'+urlencode({'query':text}),
                                'presence':'Not checked; links search the platforms'}
     headline=(f"Haan, ₹{rows[0]['dish']['price_paise']/100:g} ka listed option mila." if rows else 'Abhi confirmed priced match nahi mila.')
+    if rows and intent.budget_scope=='total':headline=f"Listed subtotal ₹{rows[0]['budget_breakdown']['listed_subtotal_paise']/100:g}; final total unconfirmed."
     if rows and not intent.dish and not intent.cuisine:headline='Explore listed menus near you.'
     alternatives=data.get('alternatives',[])
-    if not rows and alternatives:headline=f"Cheapest listed match ₹{alternatives[0]['price_paise']/100:g}; budget se upar."
+    if not rows and alternatives:headline=f"Cheapest listed {'subtotal' if intent.budget_scope=='total' else 'match'} ₹{alternatives[0].get('listed_subtotal_paise',alternatives[0]['price_paise'])/100:g}; budget se upar."
     return {'alternatives':alternatives,'headline':headline,'match_count':len(rows),'top_ids':[r['restaurant']['id'] for r in rows[:3]],
             'explanation':'Top options match the dish, listed item price and straight-line radius. Confirm current price and availability with the restaurant.' if rows else 'The available catalogue has no priced match for these constraints. Missing data does not prove the dish is unavailable.',
+            'budget_notice':'Final payable total is unconfirmed. Listed prices exclude unknown charges; discounts require eligibility and confirmation.',
+            'distance_notice':'Distances are straight-line from the selected location, not walking routes or delivery coverage.'+(' Walking distance could not be verified.' if intent.walking_requested else ''),
             'party_notice':f"Budget is for {intent.party_size} people; shown amounts are individual menu-item prices, not a confirmed group meal." if intent.party_size>1 else None,
             'mode_notice':'Delivery fees, coupons, availability and minimum orders are not included.' if intent.mode=='delivery' else 'Ordering mode must be confirmed with the restaurant.',
             'follow_ups':['Sabse paas','Aur sasta','Veg only'], 'confidence':'Source observations; no independent restaurant verification'}
@@ -81,6 +101,7 @@ def request_research(db,search_record,data,body,intent):
     from .geo import candidates
     from .agents import AREAS,distance_km
     lat,lng=(body.latitude,body.longitude) if body.latitude is not None else AREAS[intent.location or body.area]
+    if intent.location:lat,lng=AREAS[intent.location]
     query=select(Restaurant.id,Restaurant.latitude,Restaurant.longitude).join(CatalogSource,CatalogSource.restaurant_id==Restaurant.id).where(CatalogSource.enabled.is_(True),CatalogSource.kind.in_(['approved_menu','indiarestros_api']),Restaurant.sample.is_(False),Restaurant.owner_id.is_(None))
     nearby=db.execute(candidates(db,query,lat,lng,intent.radius_km).limit(80)).all()
     ids+= [row.id for row in sorted(nearby,key=lambda row:distance_km(lat,lng,row.latitude,row.longitude)) if distance_km(lat,lng,row.latitude,row.longitude)<=intent.radius_km and row.id not in ids][:10]
@@ -91,7 +112,10 @@ def request_research(db,search_record,data,body,intent):
         if len(jobs)>=3:break
         latest=db.scalar(select(CatalogJob).where(CatalogJob.source_id==source.id).order_by(CatalogJob.id.desc()).limit(1))
         if latest and latest.state in ('running','queued'):jobs.append(latest.id);continue
-        if latest and latest.finished_at and latest.finished_at>cutoff:continue
+        if latest and latest.finished_at:
+            from .catalog_worker import retry_cooldown
+            until=(datetime.now(timezone.utc)-timedelta(hours=retry_cooldown(source,latest))).isoformat() if latest.state=='failed' else cutoff
+            if latest.finished_at>until:continue
         job=CatalogJob(source_id=source.id);db.add(job)
         try:db.flush();jobs.append(job.id)
         except Exception:db.rollback();return {'state':'unavailable','message':'Source refresh already scheduled. Try again shortly.'}
@@ -178,12 +202,46 @@ def research_status(token:str,user=Depends(optional_user),db=Depends(db_session)
 def activity(db=Depends(db_session)):
     jobs=db.execute(select(CatalogJob.state,func.count()).group_by(CatalogJob.state)).all()
     runs=db.scalars(select(AgentRun).order_by(AgentRun.created_at.desc()).limit(20)).all()
-    return {'jobs':dict(jobs),'agents':[{'id':r.id,'agent':r.agent,'state':r.status,'latency_ms':r.latency_ms,'cost_microrupees':r.cost_microrupees,'created_at':r.created_at} for r in runs],
+    latest=select(CatalogJob.source_id,func.max(CatalogJob.id).label('id')).group_by(CatalogJob.source_id).subquery()
+    failures=db.scalars(select(CatalogJob).join(latest,CatalogJob.id==latest.c.id).where(CatalogJob.state=='failed')).all()
+    categories={}
+    for job in failures:
+        error=(job.error or '').lower()
+        category='rate_limited' if '429' in error else 'source_access' if any(t in error for t in ('robots','403','404','410','disabled')) else 'extraction_or_identity' if any(t in error for t in ('unambiguous','identity','brand','area','extract')) else 'provider_or_worker'
+        categories[category]=categories.get(category,0)+1
+    last_success=db.scalar(select(func.max(CatalogJob.finished_at)).where(CatalogJob.state=='succeeded'))
+    overdue=(datetime.now(timezone.utc)-timedelta(minutes=10)).isoformat()
+    stalled=db.scalar(select(func.count()).select_from(CatalogJob).where(CatalogJob.state=='running',CatalogJob.started_at<overdue)) or 0
+    return {'source_health':{'latest_failed_sources':len(failures),'failure_categories':categories,'last_successful_collection':last_success,'stalled_jobs':stalled,'retry_policy':'3 attempts with exponential backoff; source review failures cool down for at least 24 hours. Work runs while the free service is awake.'},'jobs':dict(jobs),'agents':[{'id':r.id,'agent':r.agent,'state':r.status,'latency_ms':r.latency_ms,'cost_microrupees':r.cost_microrupees,'created_at':r.created_at} for r in runs],
             'notice':'Actual recorded runs. No individual search text, account details or private platform responses are exposed.'}
 
 def admin(user=Depends(current_user)):
     if user.role!='admin':raise HTTPException(403,'Administrator role required')
     return user
+
+@router.get('/admin/catalog/jobs')
+def failed_jobs(user=Depends(admin),db=Depends(db_session)):
+    rows=db.scalars(select(CatalogJob).where(CatalogJob.state=='failed').order_by(CatalogJob.id.desc()).limit(50)).all()
+    return [{'id':r.id,'source_id':r.source_id,'attempts':r.attempts,'error':r.error,'finished_at':r.finished_at,'available_at':r.available_at} for r in rows]
+
+@router.post('/admin/catalog/jobs/{jid}/retry')
+def retry_job(jid:int,user=Depends(admin),db=Depends(db_session)):
+    job=db.scalar(select(CatalogJob).where(CatalogJob.id==jid).with_for_update())
+    if not job:raise HTTPException(404,'Job not found')
+    if job.state!='failed':raise HTTPException(409,'Only failed jobs can be retried')
+    source=db.get(CatalogSource,job.source_id)
+    if not source or not source.enabled:raise HTTPException(409,'Enable and review the source first')
+    if job.available_at>now():raise HTTPException(409,'Provider backoff is still active')
+    pending=db.scalar(select(CatalogJob.id).where(CatalogJob.source_id==job.source_id,CatalogJob.state.in_(['queued','running'])).limit(1))
+    if pending:raise HTTPException(409,'A source check is already scheduled')
+    trail=json.loads(job.trace or '[]')
+    trail.append({'agent':'Operator','tool':'reviewed_retry','administrator_id':user.id,'previous_attempts':job.attempts,'previous_error':job.error,'at':now()})
+    job.trace=json.dumps(trail[-100:])
+    job.state='queued';job.attempts=0;job.finished_at=None;job.error=None;job.available_at=now()
+    try:db.commit()
+    except Exception:
+        db.rollback();raise HTTPException(409,'Source retry already scheduled') from None
+    return {'job_id':jid,'state':'queued','notice':'Source will be checked by the worker; previous prices are not automatically revived.'}
 
 @router.get('/admin/quality')
 def quality(user=Depends(admin),db=Depends(db_session)):

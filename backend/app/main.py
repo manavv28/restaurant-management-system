@@ -130,7 +130,7 @@ def eligibility(db,user,campaign):
 @app.get('/health')
 def health(db=Depends(db_session)):
     db.execute(select(1))
-    return {'release':os.getenv('RENDER_GIT_COMMIT',os.getenv('RELEASE_SHA','development'))[:12],'database_provider':'Supabase' if (database_url.host or '').endswith(('.supabase.co','.pooler.supabase.com')) else engine.dialect.name,'database_tls':database_url.query.get('sslmode','local'),'retention_worker':os.getenv('RETENTION_WORKER_ENABLED','true').lower()=='true','status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local rules','google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'provider configured; merchant onboarding required' if all(os.getenv(k) for k in ('RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET')) else 'provider unavailable', 'payment_simulation':os.getenv('ENABLE_PAYMENT_SIMULATION','true' if os.getenv('APP_ENV')!='production' else 'false').lower()=='true'}
+    return {'release':os.getenv('RENDER_GIT_COMMIT',os.getenv('RELEASE_SHA','development'))[:12],'database_provider':'Supabase' if (database_url.host or '').endswith(('.supabase.co','.pooler.supabase.com')) else engine.dialect.name,'database_tls':database_url.query.get('sslmode','local'),'retention_worker':os.getenv('RETENTION_WORKER_ENABLED','true').lower()=='true','status':'ok','database':'connected','parser':'Gemini' if os.getenv('GEMINI_API_KEY') else 'local model configured' if os.getenv('OLLAMA_URL') else 'local rules','live_platform_comparison':False,'payment_history_access':False,'google_places':bool(os.getenv('GOOGLE_PLACES_API_KEY')),'payments':'provider configured; merchant onboarding required' if all(os.getenv(k) for k in ('RAZORPAY_KEY_ID','RAZORPAY_KEY_SECRET','RAZORPAY_WEBHOOK_SECRET')) else 'provider unavailable', 'payment_simulation':os.getenv('ENABLE_PAYMENT_SIMULATION','true' if os.getenv('APP_ENV')!='production' else 'false').lower()=='true'}
 
 @app.post('/auth/register')
 def register(body:Register,request:Request,response:Response,db=Depends(db_session)):
@@ -200,9 +200,9 @@ def search_database(body,intent,parser,user,db,progress=None):
     if area not in AREAS:
         return {'results':[],'follow_up':'Choose an area in Mumbai or share your location.','trace':[]}
     if (body.latitude is None) != (body.longitude is None): raise HTTPException(422,'Supply both latitude and longitude')
-    lat,lng = (body.latitude,body.longitude) if body.latitude is not None else AREAS[area]
+    lat,lng = (body.latitude,body.longitude) if body.latitude is not None and not intent.location else AREAS[area]
     trace = [{'agent':'Query understanding','tool':parser,'output':intent.model_dump()},
-             {'agent':'Location','tool':'resolve_coordinates','output':{'area':area,'latitude':lat,'longitude':lng}}]
+             {'agent':'Location','tool':'resolve_coordinates','output':{'area':area,'latitude':lat,'longitude':lng,'origin':'gps' if body.latitude is not None and not intent.location else 'area centre','distance_type':'straight-line'}}]
     emit('candidates_found',{'agent':'Khoji','message':'Searching the lake inside your radius','radius_km':intent.radius_km})
     matches = menu_search(db,intent,lat,lng,body.include_samples)
     emit('menu_checked',{'agent':'Munshi','message':'Database menus checked','matched_items':len(matches)})
@@ -252,9 +252,9 @@ def search_database(body,intent,parser,user,db,progress=None):
     if not unique and (intent.dish or intent.cuisine):
         above=menu_search(db,intent.model_copy(update={'max_budget':100000,'sort':'price'}),lat,lng,body.include_samples)[:3]
         for venue,menu,distance in above:
-            if menu.price_paise<=intent.max_budget*100:continue
+            if menu.price_paise*(intent.party_size if intent.budget_scope=='total' else 1)<=intent.max_budget*100:continue
             details=menu_details(db,menu,restaurant_row=venue)
-            alternatives.append({'restaurant_id':venue.id,'restaurant_name':venue.name,'dish_name':menu.name,'price_paise':menu.price_paise,'distance_km':round(distance,2),'price_status':details.get('price_status','Unverified'),'source':menu.source})
+            alternatives.append({'restaurant_id':venue.id,'restaurant_name':venue.name,'dish_name':menu.name,'price_paise':menu.price_paise,'listed_subtotal_paise':menu.price_paise*(intent.party_size if intent.budget_scope=='total' else 1),'distance_km':round(distance,2),'price_status':details.get('price_status','Unverified'),'source':menu.source})
     data['alternatives']=alternatives
     data['verdict']=verdict(data,intent)
     data['research']=request_research(db,search_record,data,body,intent) if body.research and body.stream and not unique else {'state':'not_needed' if unique else 'idle','message':'Cached catalogue answer'}
@@ -324,7 +324,7 @@ def favourite(rid:int,menu_item_id:int=0,user=Depends(current_user),db=Depends(d
 def consent(body:ConsentInput,user=Depends(current_user),db=Depends(db_session)):
     user=db.scalar(select(User).where(User.id==user.id).with_for_update().execution_options(populate_existing=True))
     user.consent=body.consent; db.commit()
-    return {'consent':user.consent,'message':'Withdrawal stops new payment processing; existing audit summaries remain until retention expiry.'}
+    return {'consent':user.consent,'scope':'BiteAI payment records only; no GPay/UPI account history access','retention_days':365,'message':'Withdrawal stops new consent-gated payment processing. Existing payment audit records are retained for up to 365 days; query-based rewards remain available.'}
 
 @app.get('/me/transactions')
 def transactions(user=Depends(current_user),db=Depends(db_session)):
@@ -503,7 +503,7 @@ def calculate_coverage(db):
     statement=select(real_counts,price_counts,source_counts,select(func.max(CatalogIdentity.observed_at)).scalar_subquery().label('last_identity')).select_from(real_counts.join(price_counts,text('true')).join(source_counts,text('true')))
     counts=dict(db.execute(statement).mappings().one())
     last=max((value for value in (counts.pop('last_source'),counts.pop('last_identity')) if value),default=None)
-    return {**counts,'snapshot_at':snapshot_at,'cache_max_age_seconds':60 if os.getenv('APP_ENV')=='production' else 0,'phone_coverage_percent':round(100*counts['public_phone_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'last_successful_collection':last,
+    return {**counts,'menu_coverage_percent':round(100*counts['source_priced_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'unpriced_restaurants':max(0,counts['real_restaurants']-counts['source_priced_restaurants']),'snapshot_at':snapshot_at,'cache_max_age_seconds':60 if os.getenv('APP_ENV')=='production' else 0,'phone_coverage_percent':round(100*counts['public_phone_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'last_successful_collection':last,
             'coverage':'Mumbai City and Mumbai Suburban listings; coverage is not exhaustive. Prices are published observations, not real-time restaurant quotes. Third-party listings may be dated and differ for delivery, portions or fees; source dates are shown where available.',
             'attribution':'Menu listing facts when present: IndiaRestros and its named sources (public API terms). Place sources: Overture Maps contributors (CDLA Permissive 2.0, Apache 2.0, CC0); © OpenStreetMap contributors (ODbL). See data sources for notices.'}
 

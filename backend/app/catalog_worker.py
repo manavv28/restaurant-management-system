@@ -2,6 +2,8 @@
 import argparse
 import asyncio
 import json
+import logging
+from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 import httpx
 from sqlalchemy import select, update
@@ -21,13 +23,31 @@ def seed_osm_sources(db,areas=None):
             db.add(CatalogSource(kind='osm',url=OSM_URL,area=area,permission_note='OpenStreetMap ODbL; retain attribution and comply with database share-alike obligations',refresh_hours=168))
     db.commit()
 
+def retry_delay_hours(exc,attempts):
+    """Bounded exponential backoff; respect numeric and HTTP-date Retry-After."""
+    seconds=min(3600,60*2**max(0,attempts-1))
+    if isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code in (429,503):
+        value=exc.response.headers.get('Retry-After','3600')
+        try:seconds=max(seconds,float(value))
+        except ValueError:
+            try:seconds=max(seconds,(parsedate_to_datetime(value)-datetime.now(timezone.utc)).total_seconds())
+            except (ValueError,TypeError,OverflowError):seconds=max(seconds,3600)
+    return max(60,min(seconds,86400))/3600
+
+
+def retry_cooldown(source,latest):
+    # Repeated extraction/identity/robots failures need source review, not an hourly storm.
+    review=latest.error and any(word in latest.error.lower() for word in ('robots','unambiguous','identity','different brand','different area','disabled','unsupported','http 403','http 404','http 410'))
+    return max(24,source.refresh_hours) if review else 6
+
+
 def schedule(db):
     queued=0
     for source in db.scalars(select(CatalogSource).where(CatalogSource.enabled.is_(True))).all():
         if source.checked_at and source.checked_at>=(datetime.now(timezone.utc)-timedelta(hours=source.refresh_hours)).isoformat():continue
         if db.scalar(select(CatalogJob.id).where(CatalogJob.source_id==source.id,CatalogJob.state.in_(['queued','running']))):continue
         latest=db.scalar(select(CatalogJob).where(CatalogJob.source_id==source.id).order_by(CatalogJob.id.desc()).limit(1))
-        if latest and latest.state=='failed' and latest.finished_at and latest.finished_at>=(datetime.now(timezone.utc)-timedelta(hours=6)).isoformat():continue
+        if latest and latest.state=='failed' and latest.finished_at and latest.finished_at>=(datetime.now(timezone.utc)-timedelta(hours=retry_cooldown(source,latest))).isoformat():continue
         db.add(CatalogJob(source_id=source.id))
         try:db.commit();queued+=1
         except IntegrityError:db.rollback()
@@ -110,10 +130,7 @@ async def run_one(job_id=None):
             elif isinstance(exc,ValueError):error=str(exc)[:200]
             else:error=f'{type(exc).__name__}: source operation failed'
             job.error=error;job.state='queued' if job.attempts<3 and source and source.enabled else 'failed'
-            delay=2**job.attempts/60
-            if isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code==429:
-                try:delay=max(delay,float(exc.response.headers.get('Retry-After','3600'))/3600)
-                except ValueError:delay=max(delay,1)
+            delay=retry_delay_hours(exc,job.attempts)
             job.available_at=future(delay);job.trace=json.dumps(trace)
             if source and source.kind=='indiarestros_api' and isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code==429:
                 db.execute(update(CatalogJob).where(CatalogJob.source_id.in_(select(CatalogSource.id).where(CatalogSource.kind=='indiarestros_api')),CatalogJob.state=='queued',CatalogJob.available_at<job.available_at).values(available_at=job.available_at))
@@ -138,12 +155,14 @@ def main():
     if args.loop:
         async def loop():
             while True:
-                with Session() as db:schedule(db)
-                # Bounded serial API batches refresh large menus without parallel fetches.
-                # Other providers and failures keep their previous one-job cadence.
-                for _ in range(5):
-                    result=await run_one();print(json.dumps(result),flush=True)
-                    if not result or result.get('source_kind')!='indiarestros_api' or result['state']!='succeeded':break
+                try:
+                    with Session() as db:schedule(db)
+                    # Serial bounded batches keep API load controlled.
+                    for _ in range(5):
+                        result=await run_one();print(json.dumps(result),flush=True)
+                        if not result or result.get('source_kind')!='indiarestros_api' or result['state']!='succeeded':break
+                except Exception:
+                    logging.exception('Catalogue cycle failed; supervisor will retry in 30 seconds')
                 await asyncio.sleep(30)
         asyncio.run(loop())
     if args.once:
