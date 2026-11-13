@@ -1,8 +1,12 @@
 # Current BiteAI status
 
-Updated 13 November 2026. Application release `b317cefc3bfa` is deployed to [the selected frontend](https://restaurant-management-system-qxtx.vercel.app), with [Render Free](https://biteai-demo.onrender.com) as backend and Supabase PostgreSQL using verify-full TLS. No paid infrastructure was added.
+Updated 13 November 2026. Application release `ae1cef5e2ce5` is deployed to [the selected frontend](https://restaurant-management-system-qxtx.vercel.app), with [Render Free](https://biteai-demo.onrender.com) as backend and Supabase PostgreSQL using verify-full TLS. No paid infrastructure was added.
 
 The public catalogue contains **10,404 real-source venues**, **357,694 source-listed prices across 2,613 restaurants**, and **8,747 public contact numbers**. There are no fictional samples in production. **7,791 venues still lack priced menus and 1,657 lack contacts**; an exhaustive Mumbai census has not been established. Original source dates and price context remain visible. These are reference observations, not current delivery or restaurant-confirmed quotes.
+
+## Suggestion display update
+
+Restaurant cards start with the top three ranked matches. **Show more** reveals the remaining returned results, **Show less** collapses them, and a new search resets the list to three. The control is omitted when there are no additional matches. The public desktop check verified 3 → 30 → 3 cards and 3 after a new search, with zero JavaScript page errors. [PR #22](https://github.com/manavv28/restaurant-management-system/pull/22) and [display verification](catalog/suggestion-display-2026-11-13.json).
 
 ## PRD work delivered
 
@@ -17,7 +21,7 @@ The public catalogue contains **10,404 real-source venues**, **357,694 source-li
 
 ## Verification and practical limits
 
-Hosted integration **[43407550923](https://github.com/manavv28/restaurant-management-system/actions/runs/43407550923)** passed **216 backend tests** (one native-PDF skip), **35 browser journeys**, migration/transfer checks, production frontend/Docker builds and non-root database smoke. Public release **[43407550899](https://github.com/manavv28/restaurant-management-system/actions/runs/43407550899)** passed the live checks. See [PRD traceability](PRD_TRACEABILITY.md) and [search latency evidence](SEARCH_LATENCY.md).
+Hosted integration **[43429838464](https://github.com/manavv28/restaurant-management-system/actions/runs/43429838464)** passed **216 backend tests** (one native-PDF skip), **36 browser journeys**, migration/transfer checks, production frontend/Docker builds and non-root database smoke. Public release **[43429838416](https://github.com/manavv28/restaurant-management-system/actions/runs/43429838416)** passed the live checks. See [PRD traceability](PRD_TRACEABILITY.md) and [search latency evidence](SEARCH_LATENCY.md).
 
 Five sequential warm original-brief probes returned 15 matches within ₹300/2 km, with a median verdict of **1.9 seconds**, improved from 13.5 seconds before the coverage-path fix. The first-event median was 835 ms in that test network. This does **not** certify a representative p95, the 600 ms first-event target or 100 concurrent users. Render Free can sleep.
 
@@ -31,4 +35,4 @@ The exact remaining requirements and required inputs are in [the completion chec
 
 Gmail accepted the configured HTTPS relay's delivery test for **letsbiteai@gmail.com**; inbox receipt and actual verification/reset completion remain unconfirmed. Full application access does not supply missing provider credentials, merchant identity or unknown restaurant facts. The entire PRD is not certified complete or production-ready.
 
-Machine-readable release evidence: [catalog/prd-release-2026-11-13.json](catalog/prd-release-2026-11-13.json). A bounded post-release log scan from 10:15:58–10:18:24 UTC found zero `request_failed` or `socket hang up` entries; this is not continuous monitoring.
+Earlier PRD checkpoint evidence (the demo was recorded at `b317cefc3bfa`): [catalog/prd-release-2026-11-13.json](catalog/prd-release-2026-11-13.json). A bounded post-release log scan from 10:15:58–10:18:24 UTC found zero `request_failed` or `socket hang up` entries; this is not continuous monitoring.

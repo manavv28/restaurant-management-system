@@ -1,0 +1,18 @@
+{
+  "origin": "https://restaurant-management-system-qxtx.vercel.app",
+  "initial_cards": 3,
+  "expanded_cards": 30,
+  "collapsed_cards": 3,
+  "new_search_cards": 3,
+  "page_errors": [],
+  "application_release": "ae1cef5e2ce5d9a997adf07b42311b8b36410b14",
+  "integration_run": 43429838464,
+  "public_verification_run": 43429838416,
+  "render_deployment": "dep-dbrgjnuc6qcc73drrkb0",
+  "vercel_deployment": "dpl_5iRHg5FCMaAYi6a5duwpmcPjRiQT",
+  "backend_tests_passed": 216,
+  "native_pdf_skip": 1,
+  "browser_journeys_passed": 36,
+  "public_checks_passed": 3,
+  "scope": "Suggestion display only; no claim that remaining PRD/provider/data prerequisites are complete."
+}
