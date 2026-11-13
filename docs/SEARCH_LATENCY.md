@@ -17,3 +17,5 @@ Corrections:
 5. Approved research candidates are considered even when the first nearby unpriced venues have no approved source. Scheduling remains limited to three jobs and existing reviewed sources, with cooldown/backoff preserved.
 
 Regression tests prohibit citywide calculation from the production verdict path, check timestamped counter caching, validate stream headers and exercise research with additional unsourced nearby venues. Local PostgreSQL validation passed 216 tests, including the existing payment/concurrency, security, publication and migration checks. Hosted and post-deployment evidence are required before reporting the final performance result.
+
+The concierge stream also avoids an unrelated unpriced-directory lookup once priced matches exist; the directory remains available and the fallback still runs when no priced match exists. Search-match and run audit writes share the final commit on the priced fast path. After indexing, the same production coverage EXPLAIN measured about 2,007 ms instead of 9,903 ms; the aggregate is still kept out of verdicts.

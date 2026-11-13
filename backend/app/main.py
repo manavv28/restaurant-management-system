@@ -240,14 +240,13 @@ def search_database(body,intent,parser,user,db,progress=None):
     db.add(search_record);db.flush()
     for match in unique:
         db.add(SearchMatch(search_id=search_record.id,restaurant_id=match['restaurant']['id'],menu_item_id=match['dish']['id'],price_paise=match['dish']['price_paise'],distance_km=match['distance_km'],source=match['dish']['source']))
-    db.commit()
     from .saarthi import verdict,request_research
     emit('price_filtered',{'agent':'Saarthi','matches':len(unique),'budget':intent.max_budget,'message':'Listed prices and distance filters applied'})
     emit('verified',{'agent':'Nigehbaan','message':'Source attribution checked; independent verification is not claimed','source_observations':len(evidence_by_id)})
     emit('offers_applied',{'agent':'Saudagar','message':'Offer eligibility checked','offers':sum(len(r['offers']) for r in unique)})
     data={'external_discovery':[],'attribution':attribution(search_record),'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': ('No matching priced menu was found. Try a larger radius or budget, or another dish.' if body.query and not unique else None) or ('What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None),
             'coverage':'Partial Mumbai coverage; source-observed prices require confirmation. Samples are fictional.',
-            'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km), 'catalog':dict(_coverage_snapshot['data']) if os.getenv('APP_ENV')=='production' and _coverage_snapshot.get('data') else None if os.getenv('APP_ENV')=='production' else catalog_coverage(db)}
+            'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km) if not unique or not body.stream else [], 'catalog':dict(_coverage_snapshot['data']) if os.getenv('APP_ENV')=='production' and _coverage_snapshot.get('data') else None if os.getenv('APP_ENV')=='production' else catalog_coverage(db)}
     alternatives=[]
     if not unique and (intent.dish or intent.cuisine):
         above=menu_search(db,intent.model_copy(update={'max_budget':100000,'sort':'price'}),lat,lng,body.include_samples)[:3]

@@ -29,6 +29,7 @@ def test_verdict_stream_preserves_real_constraints_and_logs_actual_run(client):
     assert events==['status','intent','candidates_found','menu_checked','price_filtered','verified','offers_applied','verdict']
     data=json.loads(frames[-1].split('data: ',1)[1]);assert data['verdict']['match_count']==1
     assert data['intent']['dish']=='hakka noodles'
+    assert data['nearby_unpriced']==[]
     assert data['results'][0]['dish']['price_paise']==24000
     assert not data['results'][0]['confidence']['independently_verified']
     assert data['results'][0]['platform_links']['presence'].startswith('Not checked')
