@@ -85,13 +85,14 @@ def prepare_snapshot(snapshot):
             try:price=paise(raw.get('price'))
             except ValueError:rejected+=1;continue
             key=name_key(name)
-            row={'name':name,'category':category,'price_paise':price,
+            row={'name':name,'category':category,'price_paise':price,'dietary':'vegetarian' if raw.get('veg') is True else None,
                  'source_key':'ir:'+base64.urlsafe_b64encode(hashlib.sha256((rid+'\n'+key).encode()).digest()).decode().rstrip('='),
-                 'excerpt':json.dumps({'name':name,'price_paise':price,'currency':'INR'},ensure_ascii=False,separators=(',',':'))}
+                 'excerpt':json.dumps({'name':name,'price_paise':price,'currency':'INR','veg':raw.get('veg') if type(raw.get('veg')) is bool else None},ensure_ascii=False,separators=(',',':'))}
             grouped.setdefault(key,[]).append(row)
     items=[]
     for rows in grouped.values():
         if len({r['price_paise'] for r in rows})!=1:rejected+=len(rows);continue
+        if any(row['dietary']!='vegetarian' for row in rows):rows[0]['dietary']=None
         items.append(rows[0])
     if not items:raise ValueError('No unambiguous positive INR price facts')
     if len(items)>2000:raise ValueError('Menu exceeds reviewed size limit')
@@ -157,9 +158,9 @@ input AS MATERIALIZED (
  RETURNING id,restaurant_id,url
 ), incoming AS MATERIALIZED (
  SELECT s.id AS source_id,t.restaurant_id,t.public_url,t.cuisine,t.content_hash,t.observed_at,t.expires_at,
- i.source_key,i.name,i.category,i.price_paise,i.excerpt
+ i.source_key,i.name,i.category,i.price_paise,i.excerpt,i.dietary
  FROM targets t JOIN sources s ON s.restaurant_id=t.restaurant_id AND s.url=t.api_url
- CROSS JOIN LATERAL jsonb_to_recordset(t.items) AS i(source_key text,name text,category text,price_paise integer,excerpt text)
+ CROSS JOIN LATERAL jsonb_to_recordset(t.items) AS i(source_key text,name text,category text,price_paise integer,excerpt text,dietary text)
  WHERE NOT EXISTS(SELECT 1 FROM menu_items old LEFT JOIN menu_evidence e ON e.menu_item_id=old.id
  WHERE old.restaurant_id=t.restaurant_id AND lower(old.name)=lower(i.name)
  AND (old.source_key IS NULL OR e.source_id IS DISTINCT FROM s.id))
@@ -171,10 +172,10 @@ input AS MATERIALIZED (
 ), withdrawn_items AS (
  UPDATE menu_items m SET available=false WHERE m.id IN(SELECT menu_item_id FROM withdrawn_evidence) RETURNING id
 ), saved AS (
- INSERT INTO menu_items(restaurant_id,name,category,cuisine,price_paise,description,available,source,verified_at,source_key)
- SELECT restaurant_id,name,category,cuisine,price_paise,'',true,'IndiaRestros public menu listing',NULL,source_key FROM incoming
+ INSERT INTO menu_items(restaurant_id,name,category,cuisine,price_paise,description,available,source,verified_at,source_key,dietary)
+ SELECT restaurant_id,name,category,cuisine,price_paise,'',true,'IndiaRestros public menu listing',NULL,source_key,dietary FROM incoming
  ON CONFLICT(source_key) DO UPDATE SET name=EXCLUDED.name,category=EXCLUDED.category,cuisine=EXCLUDED.cuisine,
- price_paise=EXCLUDED.price_paise,available=true,source=EXCLUDED.source
+ price_paise=EXCLUDED.price_paise,available=true,source=EXCLUDED.source,dietary=EXCLUDED.dietary
  WHERE menu_items.restaurant_id=EXCLUDED.restaurant_id
  RETURNING id,source_key,restaurant_id
 ), evidence AS (

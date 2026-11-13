@@ -8,3 +8,5 @@ pwdlib[argon2]==0.3.0
 pytest==8.4.2
 beautifulsoup4==4.15.0
 cryptography==50.0.2
+
+qrcode==8.2

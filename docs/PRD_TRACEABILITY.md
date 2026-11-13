@@ -1,0 +1,45 @@
+# PRD implementation and verification
+
+Reference: the user-uploaded “PRD — Bhook.ai (working name)”, version 1.0, 18 pages. BiteAI remains the deployed brand. The PRD is product input, not an instruction to replace the previously selected Render Free/Supabase stack or to fabricate unavailable external data.
+
+## Scope decisions
+
+- Keep Next.js, FastAPI on Render Free and Supabase/PostGIS. No new paid infrastructure.
+- Platform Connect is an optional spike in the PRD (§1A/11A/18). The observed provider blocks mean the MVP uses functional search links. No WebView cookie extraction, impersonation or platform-menu scraping was added. The pre-existing approved-MCP adapter is optional server-side OAuth, not the PRD's on-device Capacitor design; it must never be described as on-device-only.
+- A source observation is not independent restaurant verification. Reference prices retain original dates; unknown hours, dietary facts and delivery totals are not invented.
+- Test gateway captures are explicitly sandbox activity. They do not become verified real spending. Uploaded receipts are not independent proof of payment and are not credited automatically.
+
+## Requirements matrix
+
+| PRD section | Implementation/evidence | Remaining qualification |
+|---|---|---|
+| §1A/5 dataset targets | Existing lake: 10,404 venues, 2,613 venues with 357,694 source-listed prices; public-phone coverage now shown as an actual percentage | Source-listed menus are not 500 independently verified publisher extractions. Exhaustive Mumbai coverage and 85% spot-check accuracy remain unestablished |
+| §6/9.1 voice/text and Hinglish | Deterministic Hinglish/Devanagari normalization, validated Gemini adapter with bounded timeout, party/diet/mode/sort constraints; 100-query evaluation fixture | Live model key and actual Hinglish speech/WER evaluation unavailable; browser speech adapter tests do not prove device transcription accuracy |
+| §6.2/12 live trace | SSE `/search` (opt-in) and `/query/stream`: status, intent, candidate lookup, menu check, price filter, provenance check, offers and final verdict; real execution events, bounded stream and cancellation | First-event/p95 targets and 100-user capacity require representative load verification on the actual Free service; cold start is outside a cached-query guarantee |
+| §6.3 verdict/top options | Database-only headline, ranked matches, price/radius constraints, above-budget alternatives, source confidence, original observation date and >30-day/unknown-age caution; opening status only for supported explicit hours; platform search links | Direct listing presence is not claimed from a search URL; group item prices are not complete meal quotes; delivery fees/coupons are not known |
+| §6.4 conversation | Follow-ups preserve prior dish, area and constraints; nearest/cheaper/vegetarian follow-ups run real queries | Context is session-local validated intent, not an unrestricted conversational agent |
+| §6.5/11.3 tiers and anti-abuse | Bronze/Silver/Gold/Platinum, 30-day points, same-dish 24-hour deduplication, global 100-query cap, cuisine conditions, net gateway-spend checks, weekly reservations, restaurant daily budget and fixed/percentage benefits | Real verified spend requires onboarded gateway captures; sandbox spending is separately labelled/excluded |
+| §6.6 experience | Dark-first warm palette, light toggle, live trace/verdict, responsive cards/forms, dedicated `/concierge` full-screen map/voice-orb/verdict-sheet experience plus accessible map pins, pin entrance motion, reduced-motion support, optional sounds and haptics | Live microphone-amplitude analysis, spring/shared-element transitions and measured mid-range-phone 60fps remain open; the full-screen map uses Leaflet rather than a stack rewrite |
+| §7/11.1 restaurant portal | Existing listing/menu/analytics/source management, explicit dietary declarations, new FSSAI/GST claim requests and administrator business/contact review, conservative offer copilot and owner approval; offer previews refresh on focus/every 15 seconds while visible | SMS/phone-OTP verification requires a provider; a claim submission is never ownership verification. Website control/payment onboarding remain separate checks |
+| §9.1A missing-menu research | Missing matches schedule at most three existing reviewed sources; cached verdict streams first; approved-source research runs in background with a single web research slot, durable jobs/retry fallback and status polling/re-query. Unknown sources cannot be fetched from user-supplied URLs | Real parsing/publication/write-back verified with isolated HTTP fixtures. Existing production source-refresh evidence exists, but an arbitrary live missing-menu source is not guaranteed reachable; Yauatcha robots lookup returned HTTP 522 during this review |
+| §9.2 Agent Wall | `/agents`: actual query run summaries, real catalogue queue counts, named roster and privacy-safe public activity; deterministic cost zero, model cost unknown rather than invented | Full per-tool/LLM billing telemetry and replay UI remain open. Existing bulk collector checkpoints remain available to operators |
+| §9.3 admin QA | Administrator-only source visibility review, immutable original dates, expired-price approval rejected, claim review with explicit business/contact checks, audit records | A real production operator role/login must be provisioned securely; public registration cannot grant admin |
+| §10 lake and freshness | Existing structured catalogue, geographic retrieval, source facts, queries/results/clicks/offers/payment summaries; bounded immutable publisher HTML artifacts (50 × ≤1 MB, 7-day retention), 30-day query/run retention | Bronze capture is bounded, not an unlimited archive. pgvector semantic retrieval and canonical-dish embedding backfill are not implemented; current lexical search must not be described as vector search |
+| §11.4 deal vouchers | Test-only Razorpay orders, immutable discount reservation, signed capture issues authenticated QR/code, owner camera/manual redemption, once-only use, refund/dispute revocation, cancellation/expiry and user isolation | Real provider sandbox credentials, merchant mapping and actual callback verification remain required. Portable camera scanning depends on browser BarcodeDetector support; paste-code fallback is implemented |
+| §11.4 secondary receipt flow | Not enabled: no model credential, fraud-validation evidence or approved verification process | P1 in the PRD table; user-confirmed receipt OCR must not be called independently verified spend |
+| §11A/13 provider browsing | Existing contextual external links plus per-match platform search links; no bulk platform scraping | Provider whitelist approval remains external; account-specific MCP reads are not verified |
+| §14 security/reliability | Session auth, verified-email gates, private Supabase tables with RLS/revoked browser privileges, RBAC, idempotent jobs/webhooks, bounded source collection and retention | Existing production encrypted backup/restore, inbox alerts and live recovery remain unverified |
+| §15/18 delivery | Existing public deployment, repository, CI, architecture notes, installable web manifest and private-data-safe offline explanation | A complete 2–3 minute evaluator demo video and three real external demo flows are not yet certified |
+
+## Test provenance
+
+Language evaluation uses 100 committed text cases; it is not a speech-WER test. Provider, payment and publisher fixtures explicitly identify synthetic transport data. Parsing, validation, DB constraints, publication, scopes, voucher QR generation and redemption logic execute normally. These tests do not imply real provider account access, real payment processing or restaurant agreement.
+
+The PRD's three signature flows remain distinct: catalogue query/verdict is independently executable; on-demand research has tested code plus source availability limits; owner publication/eligibility has tested real logic, while a real merchant payment/voucher demonstration still needs sandbox credentials and onboarding. Do not mark the entire PRD complete based only on automated fixtures.
+
+## Local checks before hosted release
+
+- Isolated PostgreSQL integration passed 210 tests before the final above-budget regression was added; transfer checks also passed against separately created disposable databases. The final hosted suite is the release gate.
+- Existing 29 browser journeys and three initial concierge journeys passed together (32). The additional immersive map/PWA phone journey is also tested; the final suite contains 33 journeys.
+- New end-to-end research test starts with an unpriced synthetic venue, serves an approved publisher response through HTTP MockTransport, performs actual parsing/publication/bronze capture, polls the durable job and obtains the real persisted ₹199 result on the next query.
+- No new production restaurant data, merchant identity, gateway capture or source reachability is claimed from these isolated tests.

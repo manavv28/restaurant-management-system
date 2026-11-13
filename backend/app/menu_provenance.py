@@ -17,7 +17,7 @@ def source_metadata(db,evidence_by_id):
 def evidence_metadata(evidence,metadata=None):
     live=evidence.active and evidence.expires_at>now()
     if evidence.method!=API_METHOD:
-        return {'price_status':'fresh source observation' if live else 'stale or withdrawn source price','source_expires_at':evidence.expires_at}
+        return {'price_status':'fresh source observation' if live else 'stale or withdrawn source price','source_expires_at':evidence.expires_at,'source_observed_at':evidence.fetched_at}
     data=(metadata or {}).get(evidence.source_id,{})
     date=data.get('provider_updated_at')
     context=data.get('price_context','listing; dine-in/delivery not specified')

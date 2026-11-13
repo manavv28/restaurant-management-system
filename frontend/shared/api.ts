@@ -50,3 +50,31 @@ export async function ensureSearchReady(onWaiting:()=>void){
  })();
  try{await waking}finally{waking=null}
 }
+
+export type QueryStep={event:string;agent?:string;message?:string;[key:string]:unknown};
+export async function queryRequest<T>(body:unknown,onStep:(step:QueryStep)=>void,signal:AbortSignal):Promise<T>{
+ const response=await fetch('/api/search',{method:'POST',cache:'no-store',signal:AbortSignal.any([signal,AbortSignal.timeout(30000)]),headers:{'Content-Type':'application/json','X-BiteAI-Client':'browser','Accept':'text/event-stream'},body:JSON.stringify(body)});
+ const type=response.headers.get('content-type')||'';
+ if(!type.includes('text/event-stream')){
+  if(!type.includes('json'))throw new ApiError('The service is temporarily unavailable or still starting. Please try again shortly.',response.status>=400?response.status:503);
+  const data=await response.json();if(!response.ok)throw new ApiError(typeof data.detail==='string'?data.detail:'Search could not finish. Please retry.',response.status);return data;
+ }
+ if(!response.ok||!response.body)throw new ApiError('Search could not start. Please retry.',response.status);
+ const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='',total=0,result:T|undefined;
+ try{
+  while(true){
+   const {value,done}=await reader.read();if(done)break;
+   total+=value.byteLength;if(total>2_000_000)throw new Error('Search response exceeded its limit');
+   buffer+=decoder.decode(value,{stream:true}).replace(/\r\n/g,'\n');let split;
+   while((split=buffer.indexOf('\n\n'))>=0){
+    const frame=buffer.slice(0,split);buffer=buffer.slice(split+2);const event=frame.split('\n').find(line=>line.startsWith('event:'))?.slice(6).trim();const lines=frame.split('\n').filter(line=>line.startsWith('data:')).map(line=>line.slice(5).trimStart());
+    if(!event||!lines.length)continue;
+    const data=JSON.parse(lines.join('\n'));
+    if(event==='error')throw new ApiError(data.message||'Search could not finish. Please retry.',503);
+    if(event==='verdict')result=data as T;else onStep({event,...data});
+   }
+  }
+  if(!result)throw new ApiError('Search ended before a verdict arrived. Please retry.',503);
+  return result;
+ }finally{await reader.cancel().catch(()=>{});reader.releaseLock()}
+}

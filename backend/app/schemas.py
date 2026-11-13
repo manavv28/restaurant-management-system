@@ -22,6 +22,15 @@ class SearchInput(BaseModel):
     budget: int = Field(default=500,ge=1,le=100000)
     radius_km: float = Field(default=5,gt=0,le=50)
     include_samples: bool = True
+    stream: bool = False
+    research: bool = True
+    context: dict | None = None
+    @field_validator('context')
+    @classmethod
+    def bounded_context(cls,value):
+        import json
+        if value is not None and len(json.dumps(value))>2000:raise ValueError('Conversation context is too large')
+        return value
 class RestaurantInput(BaseModel):
     name: str = Field(min_length=2,max_length=150)
     address: str = Field(min_length=5,max_length=500)
@@ -54,10 +63,11 @@ class MenuInput(BaseModel):
     price_paise: int = Field(ge=1,le=10000000)
     description: str = Field(default='',max_length=1000)
     available: bool = True
+    dietary: Literal['vegetarian','jain','halal'] | None = None
 class CampaignInput(BaseModel):
     title: str = Field(min_length=2,max_length=100)
     percent: int = Field(ge=1,le=80)
-    min_searches: int = Field(default=0,ge=0,le=10000)
+    min_searches: int = Field(default=0,ge=0,le=100)
     min_spend_paise: int = Field(default=0,ge=0,le=100000000)
     min_visits: int = Field(default=0,ge=0,le=10000)
     min_order_paise: int = Field(default=0,ge=0,le=10000000)
@@ -65,7 +75,13 @@ class CampaignInput(BaseModel):
     redemption_limit: int = Field(default=1,ge=1,le=100)
     starts_at: datetime
     ends_at: datetime
+    min_tier: Literal['Bronze','Silver','Gold','Platinum'] = 'Bronze'
+    cuisine: str = Field(default='',max_length=100)
+    cuisine_queries_30d: int = Field(default=0,ge=0,le=100)
+    daily_budget_paise: int = Field(default=200000,ge=1,le=100000000)
+    flat_discount_paise: int = Field(default=0,ge=0,le=10000000)
 class TransactionInput(BaseModel):
+    campaign_id: int | None = Field(default=None,ge=1)
     restaurant_id: int
     amount_paise: int = Field(ge=1,le=10000000)
 class RedeemInput(BaseModel):

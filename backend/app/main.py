@@ -24,7 +24,9 @@ class PrivateRequestQueries(logging.Filter):
         # OAuth authorization codes and state must not appear in app access logs.
         if isinstance(record.args,tuple) and len(record.args)==5:
             values=list(record.args)
-            if isinstance(values[2],str):values[2]=values[2].split('?',1)[0]
+            if isinstance(values[2],str):
+                values[2]=values[2].split('?',1)[0]
+                if values[2].startswith(('/research/','/api/research/')):values[2]='/research/[redacted]'
             record.args=tuple(values)
         return True
 
@@ -50,6 +52,12 @@ app.include_router(insights_router)
 app.include_router(ownership_router)
 app.include_router(platforms_router)
 app.include_router(zomato_router)
+from .saarthi import router as concierge_router
+app.include_router(concierge_router)
+from .vouchers import router as voucher_router
+app.include_router(voucher_router)
+from .partners import router as partner_router
+app.include_router(partner_router)
 app.add_middleware(CORSMiddleware,allow_origins=os.getenv('CORS_ORIGINS','http://localhost:3000,http://127.0.0.1:3000').split(','),allow_methods=['GET','POST','PUT','DELETE'],allow_headers=['Authorization','Content-Type'])
 
 @app.middleware('http')
@@ -69,7 +77,7 @@ async def browser_security(request: Request, call_next):
         return JSONResponse({'detail':'Request failed. Please try again.','request_id':request_id},status_code=500)
     response.headers['X-Request-ID']=request_id
     if response.status_code>=500:logging.error('request_error request_id=%s status=%s elapsed_ms=%d',request_id,response.status_code,int((time.monotonic()-started)*1000))
-    if request.url.path.startswith(('/auth','/me','/portal','/payments','/platforms')):
+    if request.url.path.startswith(('/auth','/me','/portal','/payments','/platforms','/admin','/partner','/research','/query','/search')):
         response.headers['Cache-Control'] = 'no-store'
     if request.url.path.startswith('/platforms'):response.headers['Referrer-Policy']='no-referrer'
     return response
@@ -94,16 +102,19 @@ def owned(db,rid,user):
     if r.owner_id != user.id: raise HTTPException(403,'You do not own this restaurant')
     return r
 
-def stats(db,user_id,restaurant_id=None):
+def stats(db,user_id,restaurant_id=None,days=None):
     searches = db.scalar(select(func.count()).select_from(Search).where(Search.user_id==user_id)) or 0
-    tx = select(Transaction).where(Transaction.user_id==user_id,Transaction.simulated.is_(False),Transaction.disputed.is_(False),Transaction.refunded_paise<Transaction.amount_paise)
+    tx = select(Transaction).where(Transaction.user_id==user_id,Transaction.simulated.is_(False),Transaction.test_mode.is_(False),Transaction.disputed.is_(False),Transaction.refunded_paise<Transaction.amount_paise)
+    if days:tx=tx.where(Transaction.created_at>=(datetime.now(timezone.utc)-timedelta(days=days)).isoformat())
     if restaurant_id: tx = tx.where(Transaction.restaurant_id==restaurant_id)
     transactions = db.scalars(tx).all()
     return {'searches':searches,'verified_spend_paise':sum(t.amount_paise-t.refunded_paise for t in transactions),'verified_visits':len(transactions)}
 
 def eligibility(db,user,campaign):
-    state = stats(db,user.id,campaign.restaurant_id)
-    count = db.scalar(select(func.count()).select_from(Redemption).where(Redemption.user_id==user.id,Redemption.campaign_id==campaign.id)) or 0
+    state = stats(db,user.id,campaign.restaurant_id,days=30)
+    from .saudagar import meaningful_queries,policy_check,active_reservations
+    state['searches']=meaningful_queries(db,user.id)
+    count = db.scalar(select(func.count()).select_from(Redemption).where(Redemption.user_id==user.id,Redemption.campaign_id==campaign.id,active_reservations())) or 0
     time = now()
     reasons = []
     if not campaign.starts_at <= time <= campaign.ends_at: reasons.append('Campaign is outside its validity period')
@@ -111,7 +122,8 @@ def eligibility(db,user,campaign):
     if state['verified_spend_paise'] < campaign.min_spend_paise: reasons.append('Verified restaurant spending requirement not met')
     if state['verified_visits'] < campaign.min_visits: reasons.append('Verified repeat visits requirement not met')
     if count >= campaign.redemption_limit: reasons.append('Redemption limit reached')
-    return {'eligible':not reasons,'reasons':reasons,'state':state,'redemptions':count}
+    additional,limits=policy_check(db,user,campaign);reasons.extend(additional)
+    return {'eligible':not reasons,'reasons':reasons,'state':state,'redemptions':count,'policy_limits':limits}
 
 @app.get('/health')
 def health(db=Depends(db_session)):
@@ -140,16 +152,24 @@ def login(body:Login,request:Request,response:Response,db=Depends(db_session)):
 @app.get('/me')
 def me(user=Depends(current_user),db=Depends(db_session)):
     preference=db.get(Preference,user.id)
-    return {**public(user),**stats(db,user.id),'preferred_cuisine':preference.preferred_cuisine if preference else ''}
+    from .saudagar import tier_state
+    return {**public(user),**stats(db,user.id),'rewards':tier_state(db,user.id),'preferred_cuisine':preference.preferred_cuisine if preference else ''}
 
 @app.get('/areas')
 def areas(): return AREAS
 
 @app.post('/search')
-async def search(body:SearchInput,user=Depends(optional_user),db=Depends(db_session)):
+async def search(body:SearchInput,request:Request,user=Depends(optional_user),db=Depends(db_session)):
+    from .account_security import throttle
+    await run_in_threadpool(throttle,db,'concierge-query',str(user.id) if user else (request.client.host if request.client else 'unknown'),limit=60 if user else 300,seconds=600)
+    if body.stream:
+        from .saarthi import stream_search
+        return await stream_search(body,user.id if user else None)
     await run_in_threadpool(db.commit)
     try:
         intent, parser = await understand(body.query,body.budget,body.radius_km)
+        from .saarthi import continued_intent
+        intent=continued_intent(body.query,intent,body.context)
     except ValueError:
         raise HTTPException(422,'Budget must be ₹1–100,000 and radius must be greater than zero and at most 50 km')
     data=await run_in_threadpool(search_database,body,intent,parser,user,db)
@@ -170,7 +190,10 @@ async def search(body:SearchInput,user=Depends(optional_user),db=Depends(db_sess
     return data
 
 
-def search_database(body,intent,parser,user,db):
+def search_database(body,intent,parser,user,db,progress=None):
+    import time
+    started=time.monotonic()
+    emit=progress or (lambda name,data:None)
     area = intent.location or body.area
     if area not in AREAS:
         return {'results':[],'follow_up':'Choose an area in Mumbai or share your location.','trace':[]}
@@ -178,7 +201,9 @@ def search_database(body,intent,parser,user,db):
     lat,lng = (body.latitude,body.longitude) if body.latitude is not None else AREAS[area]
     trace = [{'agent':'Query understanding','tool':parser,'output':intent.model_dump()},
              {'agent':'Location','tool':'resolve_coordinates','output':{'area':area,'latitude':lat,'longitude':lng}}]
+    emit('candidates_found',{'agent':'Khoji','message':'Searching the lake inside your radius','radius_km':intent.radius_km})
     matches = menu_search(db,intent,lat,lng,body.include_samples)
+    emit('menu_checked',{'agent':'Munshi','message':'Database menus checked','matched_items':len(matches)})
     preference=db.get(Preference,user.id) if user else None
     if preference and preference.preferred_cuisine and not intent.cuisine and not intent.dish:
         matches.sort(key=lambda row:preference.preferred_cuisine.lower() not in row[0].cuisine.lower())
@@ -194,7 +219,14 @@ def search_database(body,intent,parser,user,db):
             campaigns.setdefault(campaign.restaurant_id,[]).append(campaign)
     unique=[]
     for r,item,distance in best.values():
-        offers=[public(c) for c in campaigns.get(r.id,[]) if eligibility(db,user,c)['eligible']]
+        offers=[]
+        for campaign in campaigns.get(r.id,[]):
+            check=eligibility(db,user,campaign)
+            if not check['eligible']:continue
+            limits=check['policy_limits'];flat=limits['flat_discount_paise'] if limits else 0
+            discount=min(flat or item.price_paise*campaign.percent//100,campaign.max_discount_paise,item.price_paise)
+            applies=item.price_paise>=campaign.min_order_paise and (not limits or discount<=limits['remaining_paise'])
+            offers.append({**public(campaign),'benefit_label':('₹'+str(flat/100)+' off') if flat else str(campaign.percent)+'% off','eligible':True,'discount_paise':discount if applies else 0,'final_price_paise':item.price_paise-discount if applies else item.price_paise,'applies_to_item':applies,'notice':'Offer preview, not a locked-in quote. Checkout and restaurant confirmation required.'})
         dish=menu_details(db,item,evidence_by_id=evidence_by_id,restaurant_row=r,source_metadata_by_id=price_sources)
         note='Fictional sample listing.' if r.sample else 'Price observed on the published menu; confirm with the restaurant.' if item.id in evidence_by_id else 'Owner supplied menu; price not independently verified.'
         if dish.get('price_is_reference'):note='Third-party listed price; confirm the current price and ordering mode with the restaurant.'
@@ -208,9 +240,29 @@ def search_database(body,intent,parser,user,db):
     for match in unique:
         db.add(SearchMatch(search_id=search_record.id,restaurant_id=match['restaurant']['id'],menu_item_id=match['dish']['id'],price_paise=match['dish']['price_paise'],distance_km=match['distance_km'],source=match['dish']['source']))
     db.commit()
-    return {'external_discovery':[],'attribution':attribution(search_record),'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': ('No matching priced menu was found. Try a larger radius or budget, or another dish.' if body.query and not unique else None) or ('What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None),
+    from .saarthi import verdict,request_research
+    emit('price_filtered',{'agent':'Saarthi','matches':len(unique),'budget':intent.max_budget,'message':'Listed prices and distance filters applied'})
+    emit('verified',{'agent':'Nigehbaan','message':'Source attribution checked; independent verification is not claimed','source_observations':len(evidence_by_id)})
+    emit('offers_applied',{'agent':'Saudagar','message':'Offer eligibility checked','offers':sum(len(r['offers']) for r in unique)})
+    data={'external_discovery':[],'attribution':attribution(search_record),'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': ('No matching priced menu was found. Try a larger radius or budget, or another dish.' if body.query and not unique else None) or ('What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None),
             'coverage':'Partial Mumbai coverage; source-observed prices require confirmation. Samples are fictional.',
             'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km), 'catalog':catalog_coverage(db)}
+    alternatives=[]
+    if not unique and (intent.dish or intent.cuisine):
+        above=menu_search(db,intent.model_copy(update={'max_budget':100000,'sort':'price'}),lat,lng,body.include_samples)[:3]
+        for venue,menu,distance in above:
+            if menu.price_paise<=intent.max_budget*100:continue
+            details=menu_details(db,menu,restaurant_row=venue)
+            alternatives.append({'restaurant_id':venue.id,'restaurant_name':venue.name,'dish_name':menu.name,'price_paise':menu.price_paise,'distance_km':round(distance,2),'price_status':details.get('price_status','Unverified'),'source':menu.source})
+    data['alternatives']=alternatives
+    data['verdict']=verdict(data,intent)
+    data['research']=request_research(db,search_record,data,body,intent) if body.research and body.stream and not unique else {'state':'not_needed' if unique else 'idle','message':'Cached catalogue answer'}
+    db.add(AgentRun(id=uuid.uuid4().hex,agent='Saarthi',status='succeeded',search_id=search_record.id,summary=json.dumps({'tools':['parse_intent','geo_menu_search','source_attribution','campaign_eligibility'],'matches':len(unique)}),latency_ms=int((time.monotonic()-started)*1000),cost_microrupees=None if parser.startswith('Gemini') else 0));db.commit()
+    return data
+
+@app.post('/query/stream')
+async def query_stream(body:SearchInput,request:Request,user=Depends(optional_user),db=Depends(db_session)):
+    return await search(body.model_copy(update={'stream':True}),request,user,db)
 
 @app.get('/restaurants/{rid}')
 def restaurant(rid:int,db=Depends(db_session)):
@@ -291,7 +343,7 @@ app.include_router(payments_router)
 
 @app.get('/me/offers')
 def offers(user=Depends(current_user),db=Depends(db_session)):
-    return [{**public(c),'restaurant_name':db.get(Restaurant,c.restaurant_id).name,**eligibility(db,user,c)} for c in db.scalars(select(Campaign)).all()]
+    return [{**public(c),'benefit_label':('₹'+str(policy.flat_discount_paise/100)+' off') if (policy:=db.get(CampaignPolicy,c.id)) and policy.flat_discount_paise else str(c.percent)+'% off','restaurant_name':db.get(Restaurant,c.restaurant_id).name,**eligibility(db,user,c)} for c in db.scalars(select(Campaign)).all()]
 
 @app.get('/me/redemptions')
 def redemptions(user=Depends(current_user),db=Depends(db_session)):
@@ -302,12 +354,15 @@ def redeem(cid:int,body:RedeemInput,user=Depends(verified_user),db=Depends(db_se
     # Serialize each user's redemptions on PostgreSQL; unique sequence protects SQLite races.
     db.scalar(select(User).where(User.id==user.id).with_for_update())
     c = db.get(Campaign,cid)
+    if c:db.scalar(select(Restaurant).where(Restaurant.id==c.restaurant_id).with_for_update())
     if not c: raise HTTPException(404,'Campaign not found')
     check=eligibility(db,user,c)
     if not check['eligible']: raise HTTPException(403,check['reasons'])
     if body.order_paise < c.min_order_paise: raise HTTPException(422,'Minimum order value not reached')
-    discount=min(body.order_paise*c.percent//100,c.max_discount_paise)
-    r=Redemption(user_id=user.id,campaign_id=cid,sequence=check['redemptions']+1,order_paise=body.order_paise,discount_paise=discount,audit=json.dumps({'eligibility':check,'campaign':public(c),'calculation':'min(order_paise * percent // 100, cap)'}))
+    limits=check.get('policy_limits')
+    discount=min((limits['flat_discount_paise'] if limits and limits['flat_discount_paise'] else body.order_paise*c.percent//100),c.max_discount_paise,body.order_paise)
+    if limits and discount>limits['remaining_paise']:raise HTTPException(409,'Restaurant daily discount budget cannot cover this offer')
+    r=Redemption(user_id=user.id,campaign_id=cid,sequence=(db.scalar(select(func.max(Redemption.sequence)).where(Redemption.user_id==user.id,Redemption.campaign_id==cid)) or 0)+1,order_paise=body.order_paise,discount_paise=discount,audit=json.dumps({'eligibility':check,'campaign':public(c),'calculation':'min(order_paise * percent // 100, cap)'}))
     db.add(r)
     try: db.commit()
     except IntegrityError:
@@ -353,9 +408,10 @@ def update_menu(rid:int,mid:int,body:MenuInput,user=Depends(owner),db=Depends(db
 def campaign(rid:int,body:CampaignInput,user=Depends(owner),db=Depends(db_session)):
     owned(db,rid,user)
     if not body.starts_at.tzinfo or not body.ends_at.tzinfo or body.ends_at <= body.starts_at: raise HTTPException(422,'Supply timezone-aware, ordered campaign dates')
-    values=body.model_dump()
+    values=body.model_dump(exclude={'min_tier','cuisine','cuisine_queries_30d','daily_budget_paise','flat_discount_paise'})
     values.update(starts_at=body.starts_at.astimezone(timezone.utc).isoformat(),ends_at=body.ends_at.astimezone(timezone.utc).isoformat())
-    c=Campaign(restaurant_id=rid,**values); db.add(c); db.commit(); return public(c)
+    c=Campaign(restaurant_id=rid,**values); db.add(c);db.flush()
+    policy=CampaignPolicy(campaign_id=c.id,**body.model_dump(include={'min_tier','cuisine','cuisine_queries_30d','daily_budget_paise','flat_discount_paise'}));db.add(policy);db.commit();return {**public(c),'policy':public(policy)}
 
 @app.get('/portal/restaurants/{rid}/analytics')
 def analytics(rid:int,user=Depends(owner),db=Depends(db_session)):
@@ -429,13 +485,13 @@ def profile(body:ProfileInput,user=Depends(current_user),db=Depends(db_session))
 
 @app.get('/catalog/coverage')
 def catalog_coverage(db=Depends(db_session)):
-    real_counts=select(func.count().filter(Restaurant.sample.is_(False)).label('real_restaurants'),func.count().filter(Restaurant.sample.is_(True)).label('sample_restaurants')).subquery()
+    real_counts=select(func.count().filter(Restaurant.sample.is_(False)).label('real_restaurants'),func.count().filter(Restaurant.sample.is_(True)).label('sample_restaurants'),func.count().filter(Restaurant.sample.is_(False),Restaurant.phone!='').label('public_phone_restaurants')).subquery()
     price_counts=select(func.count(MenuEvidence.menu_item_id).label('fresh_source_menu_items'),func.count(func.distinct(MenuItem.restaurant_id)).label('source_priced_restaurants')).select_from(MenuEvidence).join(MenuItem,MenuItem.id==MenuEvidence.menu_item_id).join(Restaurant,Restaurant.id==MenuItem.restaurant_id).where(MenuItem.available.is_(True),Restaurant.sample.is_(False),MenuEvidence.active.is_(True),MenuEvidence.expires_at>now()).subquery()
     source_counts=select(func.count().filter(CatalogSource.enabled.is_(True)).label('enabled_sources'),func.max(CatalogSource.checked_at).label('last_source')).subquery()
     statement=select(real_counts,price_counts,source_counts,select(func.max(CatalogIdentity.observed_at)).scalar_subquery().label('last_identity')).select_from(real_counts.join(price_counts,text('true')).join(source_counts,text('true')))
     counts=dict(db.execute(statement).mappings().one())
     last=max((value for value in (counts.pop('last_source'),counts.pop('last_identity')) if value),default=None)
-    return {**counts,'last_successful_collection':last,
+    return {**counts,'phone_coverage_percent':round(100*counts['public_phone_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'last_successful_collection':last,
             'coverage':'Mumbai City and Mumbai Suburban listings; coverage is not exhaustive. Prices are published observations, not real-time restaurant quotes. Third-party listings may be dated and differ for delivery, portions or fees; source dates are shown where available.',
             'attribution':'Menu listing facts when present: IndiaRestros and its named sources (public API terms). Place sources: Overture Maps contributors (CDLA Permissive 2.0, Apache 2.0, CC0); © OpenStreetMap contributors (ODbL). See data sources for notices.'}
 

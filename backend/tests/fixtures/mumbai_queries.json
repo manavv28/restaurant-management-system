@@ -1,0 +1,947 @@
+[
+  {
+    "query": "Hakka noodles under ₹300 within 2 km in Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani under ₹250 within 3 km in Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza under ₹1500 within 5 km in Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa under ₹100 within 1.5 km in Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav under ₹50 within 4 km in Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Hakka noodles 300 mein 2 km ke andar Bandra mein?",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani 250 mein 3 km ke andar Andheri mein?",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza 1500 mein 5 km ke andar Powai mein?",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa 100 mein 1.5 km ke andar Colaba mein?",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav 50 mein 4 km ke andar Dadar mein?",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Hakka noodles khane ka mann hai, budget 300, 2 km in Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani khane ka mann hai, budget 250, 3 km in Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza khane ka mann hai, budget 1500, 5 km in Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa khane ka mann hai, budget 100, 1.5 km in Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav khane ka mann hai, budget 50, 4 km in Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Find Hakka noodles below 300 within 2 kilometres near Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "Find biryani below 250 within 3 kilometres near Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "Find pizza below 1500 within 5 kilometres near Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "Find dosa below 100 within 1.5 kilometres near Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "Find vada pav below 50 within 4 kilometres near Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Bandra mein Hakka noodles, ₹300 tak, 2 km",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "Andheri mein biryani, ₹250 tak, 3 km",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "Powai mein pizza, ₹1500 tak, 5 km",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "Colaba mein dosa, ₹100 tak, 1.5 km",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "Dadar mein vada pav, ₹50 tak, 4 km",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Can I get Hakka noodles for 300 within 2 km in Bandra?",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "Can I get biryani for 250 within 3 km in Andheri?",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "Can I get pizza for 1500 within 5 km in Powai?",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "Can I get dosa for 100 within 1.5 km in Colaba?",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "Can I get vada pav for 50 within 4 km in Dadar?",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Sabse sasta Hakka noodles under 300 within 2 km in Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "sort": "price"
+    }
+  },
+  {
+    "query": "Sabse sasta biryani under 250 within 3 km in Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "sort": "price"
+    }
+  },
+  {
+    "query": "Sabse sasta pizza under 1500 within 5 km in Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "sort": "price"
+    }
+  },
+  {
+    "query": "Sabse sasta dosa under 100 within 1.5 km in Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "sort": "price"
+    }
+  },
+  {
+    "query": "Sabse sasta vada pav under 50 within 4 km in Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "sort": "price"
+    }
+  },
+  {
+    "query": "Sabse paas Hakka noodles below 300 within 2 km in Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "sort": "distance"
+    }
+  },
+  {
+    "query": "Sabse paas biryani below 250 within 3 km in Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "sort": "distance"
+    }
+  },
+  {
+    "query": "Sabse paas pizza below 1500 within 5 km in Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "sort": "distance"
+    }
+  },
+  {
+    "query": "Sabse paas dosa below 100 within 1.5 km in Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "sort": "distance"
+    }
+  },
+  {
+    "query": "Sabse paas vada pav below 50 within 4 km in Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "sort": "distance"
+    }
+  },
+  {
+    "query": "Hakka noodles under 300 2 km Bandra delivery",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "mode": "delivery"
+    }
+  },
+  {
+    "query": "biryani under 250 3 km Andheri delivery",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "mode": "delivery"
+    }
+  },
+  {
+    "query": "pizza under 1500 5 km Powai delivery",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "mode": "delivery"
+    }
+  },
+  {
+    "query": "dosa under 100 1.5 km Colaba delivery",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "mode": "delivery"
+    }
+  },
+  {
+    "query": "vada pav under 50 4 km Dadar delivery",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "mode": "delivery"
+    }
+  },
+  {
+    "query": "Hakka noodles under ₹300 within 2 km in Bandra, dine-in",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "mode": "dine-in"
+    }
+  },
+  {
+    "query": "biryani under ₹250 within 3 km in Andheri, dine-in",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "mode": "dine-in"
+    }
+  },
+  {
+    "query": "pizza under ₹1500 within 5 km in Powai, dine-in",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "mode": "dine-in"
+    }
+  },
+  {
+    "query": "dosa under ₹100 within 1.5 km in Colaba, dine-in",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "mode": "dine-in"
+    }
+  },
+  {
+    "query": "vada pav under ₹50 within 4 km in Dadar, dine-in",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "mode": "dine-in"
+    }
+  },
+  {
+    "query": "4 log ke liye Hakka noodles ₹300 tak, 2 km Bandra, delivery",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "mode": "delivery",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "4 log ke liye biryani ₹250 tak, 3 km Andheri, delivery",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "mode": "delivery",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "4 log ke liye pizza ₹1500 tak, 5 km Powai, delivery",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "mode": "delivery",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "4 log ke liye dosa ₹100 tak, 1.5 km Colaba, delivery",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "mode": "delivery",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "4 log ke liye vada pav ₹50 tak, 4 km Dadar, delivery",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "mode": "delivery",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "Hakka noodles ₹300 2 km Bandra, abhi khula ho",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "open_now": true
+    }
+  },
+  {
+    "query": "biryani ₹250 3 km Andheri, abhi khula ho",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "open_now": true
+    }
+  },
+  {
+    "query": "pizza ₹1500 5 km Powai, abhi khula ho",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "open_now": true
+    }
+  },
+  {
+    "query": "dosa ₹100 1.5 km Colaba, abhi khula ho",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "open_now": true
+    }
+  },
+  {
+    "query": "vada pav ₹50 4 km Dadar, abhi khula ho",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "open_now": true
+    }
+  },
+  {
+    "query": "Hakka noodles less than 300 within 2 km Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani less than 250 within 3 km Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza less than 1500 within 5 km Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa less than 100 within 1.5 km Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav less than 50 within 4 km Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Hakka noodles budget of 300, 2 km near Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani budget of 250, 3 km near Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza budget of 1500, 5 km near Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa budget of 100, 1.5 km near Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav budget of 50, 4 km near Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Hakka noodles Rs. 300 within 2 km at Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani Rs. 250 within 3 km at Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza Rs. 1500 within 5 km at Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa Rs. 100 within 1.5 km at Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav Rs. 50 within 4 km at Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Want Hakka noodles under 300 within 2 km in Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "Want biryani under 250 within 3 km in Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "Want pizza under 1500 within 5 km in Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "Want dosa under 100 within 1.5 km in Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "Want vada pav under 50 within 4 km in Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Hakka noodles 300 rupees, 2 km in Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani 250 rupees, 3 km in Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza 1500 rupees, 5 km in Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa 100 rupees, 1.5 km in Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav 50 rupees, 4 km in Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Hakka noodles 300 ke andar 2 km Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra"
+    }
+  },
+  {
+    "query": "biryani 250 ke andar 3 km Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri"
+    }
+  },
+  {
+    "query": "pizza 1500 ke andar 5 km Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai"
+    }
+  },
+  {
+    "query": "dosa 100 ke andar 1.5 km Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba"
+    }
+  },
+  {
+    "query": "vada pav 50 ke andar 4 km Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar"
+    }
+  },
+  {
+    "query": "Group of 4: Hakka noodles under ₹300 within 2 km Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "Group of 4: biryani under ₹250 within 3 km Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "Group of 4: pizza under ₹1500 within 5 km Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "Group of 4: dosa under ₹100 within 1.5 km Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "Group of 4: vada pav under ₹50 within 4 km Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "party_size": 4
+    }
+  },
+  {
+    "query": "Vegetarian Hakka noodles under ₹300, 2 km Bandra",
+    "expected": {
+      "dish": "hakka noodles",
+      "max_budget": 300,
+      "radius_km": 2,
+      "location": "Bandra",
+      "diet": "vegetarian"
+    }
+  },
+  {
+    "query": "Vegetarian biryani under ₹250, 3 km Andheri",
+    "expected": {
+      "dish": "biryani",
+      "max_budget": 250,
+      "radius_km": 3,
+      "location": "Andheri",
+      "diet": "vegetarian"
+    }
+  },
+  {
+    "query": "Vegetarian pizza under ₹1500, 5 km Powai",
+    "expected": {
+      "dish": "pizza",
+      "max_budget": 1500,
+      "radius_km": 5,
+      "location": "Powai",
+      "diet": "vegetarian"
+    }
+  },
+  {
+    "query": "Vegetarian dosa under ₹100, 1.5 km Colaba",
+    "expected": {
+      "dish": "dosa",
+      "max_budget": 100,
+      "radius_km": 1.5,
+      "location": "Colaba",
+      "diet": "vegetarian"
+    }
+  },
+  {
+    "query": "Vegetarian vada pav under ₹50, 4 km Dadar",
+    "expected": {
+      "dish": "vada pav",
+      "max_budget": 50,
+      "radius_km": 4,
+      "location": "Dadar",
+      "diet": "vegetarian"
+    }
+  }
+]
