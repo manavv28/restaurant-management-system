@@ -8,7 +8,7 @@ from app.catalog_worker import schedule
 
 def test_pizza_snacks_cannot_hide_a_real_pizza_at_same_restaurant(client):
     owner=account(client,'pizza-audit@example.test','owner');rid=restaurant(client,owner)
-    for name,price in [('BK Veg Pizza Puff.',6500),('BK Veg Pizza Puff+Coke.',16400),('Pizza Pocket',7000),('Pizza Sandwich',8000),('Margherita Pizza (Regular)',18000)]:
+    for name,price in [('BK Veg Pizza Puff.',6500),('BK Veg Pizza Puff+Coke.',16400),('Veg Pizza McPuff',6900),('Extra Cheese In Pizza',5000),('Pizza Bread 125gm',3000),('Pizza Stick (6Pcs)',12000),('Pizza Pocket',7000),('Pizza Sandwich',8000),('Margherita Pizza (Regular)',18000)]:
         assert client.post(f'/portal/restaurants/{rid}/menu',headers=owner,json={'name':name,'cuisine':'Italian','price_paise':price}).status_code==200
     rows=client.post('/search',json={'query':'pizza under 200','include_samples':False}).json()['results']
     assert len(rows)==1 and rows[0]['dish']['name']=='Margherita Pizza (Regular)'

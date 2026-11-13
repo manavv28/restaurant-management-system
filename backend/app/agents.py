@@ -40,7 +40,7 @@ def parse_local(query, budget=500, radius=5):
     cuisine = None
     cuisines = ['Chinese','Indian','Italian','Japanese','Mexican','South Indian']
     cuisine = next((c for c in reversed(cuisines) if c.lower() in q), None)
-    dishes = ['hakka noodles','noodles soup','pizza puff','pizza pocket','pizza sandwich','pizza burger','pasta salad','pasta soup',
+    dishes = ['hakka noodles','noodles soup','pizza puff','pizza pocket','pizza sandwich','pizza burger','pizza mcpuff','pizza bread','pizza sticks','pizza stick','mcpuff','pasta salad','pasta soup',
               'noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vadapav','vada pav',
               'coffee','tea','juice','ice cream','soup','salad']
     def negated(term):
@@ -126,11 +126,13 @@ def menu_search(db, intent, lat, lng, include_samples=True):
         aliases={'burger':['burger','cheeseburger'],'tacos':['tacos','taco']}.get(phrase,[phrase])
         query=query.where(or_(*(padded.contains(' '+alias+' ',autoescape=True) for alias in aliases)),~MenuItem.name.contains(' / '),~MenuItem.name.icontains(' or '))
         # Related snacks are not the requested dish. Explicit custom snack queries still work.
-        derivatives={'pizza':('puff','puffs','pocket','pockets','sandwich','burger','fries'),
+        derivatives={'pizza':('puff','puffs','mcpuff','pocket','pockets','sandwich','burger','fries','bread','stick','sticks','topping','toppings'),
                      'burger':('pizza','sandwich','fries'), 'noodles':('soup','samosa','spring roll'),
                      'hakka noodles':('soup','samosa','spring roll'),'pasta':('soup','salad','sandwich'),
                      'biryani':('arancini','samosa'),'dosa':('chips',)}
         for term in derivatives.get(phrase,()):query=query.where(~padded.contains(' '+term+' ',autoescape=True))
+        if not phrase.startswith(('extra ','add on ','add-on ')):
+            for prefix in ('extra ','add on ','add-on '):query=query.where(~func.lower(MenuItem.name).startswith(prefix,autoescape=True))
     for term in intent.excluded_dishes:
         if term:query=query.where(~MenuItem.name.icontains(term[:150],autoescape=True))
     for term in intent.excluded_cuisines:
