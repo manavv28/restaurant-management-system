@@ -11,6 +11,8 @@ def meaningful_queries(db,user_id,cuisine=''):
     for row in rows:
         key=(row.dish or row.cuisine or '').casefold().strip()
         if not key:continue
+        known={'hakka noodles','noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vada pav'}
+        if row.results<=0 and (row.cuisine or '').casefold() not in {'chinese','indian','italian','japanese','mexican','south indian'} and (row.dish or '').casefold() not in known:continue
         try:at=datetime.fromisoformat(row.created_at)
         except ValueError:continue
         if key in last and at-last[key]<timedelta(hours=24):continue

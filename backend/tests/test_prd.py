@@ -124,3 +124,10 @@ def test_ai_proposals_need_operator_review_and_expired_prices_cannot_be_approved
     assert client.post('/search',json={'query':'Hakka noodles under 300','include_samples':False}).json()['results']
     with Session() as db:db.get(MenuEvidence,mid).expires_at=(datetime.now(timezone.utc)-timedelta(days=1)).isoformat();db.commit()
     assert client.post('/admin/quality/'+str(mid),headers=operator,json={'decision':'approve','note':'Expired observations cannot be revived'}).status_code==409
+
+
+def test_unrecognised_zero_result_queries_do_not_earn_reward_credit(client):
+    auth=account(client)
+    for q in ['find asdfgh qwerty','find nonsenseabc xyz','']:
+        assert client.post('/search',headers=auth,json={'query':q}).status_code==200
+    assert client.get('/me',headers=auth).json()['rewards']['meaningful_queries_30d']==0

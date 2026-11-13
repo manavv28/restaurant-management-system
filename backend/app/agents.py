@@ -9,11 +9,11 @@ from .database import Restaurant, MenuItem, MenuEvidence, now
 log = logging.getLogger('biteai.agents')
 from .areas import AREAS
 class Intent(BaseModel):
-    cuisine: str | None = None
-    dish: str | None = None
+    cuisine: str | None = Field(default=None,max_length=100)
+    dish: str | None = Field(default=None,max_length=150)
     max_budget: int = Field(default=500, ge=1, le=100000)
     radius_km: float = Field(default=5, gt=0, le=50)
-    location: str | None = None
+    location: str | None = Field(default=None,max_length=80)
     diet: Literal['vegetarian','jain','halal'] | None = None
     open_now: bool = False
     mode: Literal['any','delivery','dine-in'] = 'any'
