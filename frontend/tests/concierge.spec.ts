@@ -40,3 +40,14 @@ test('immersive PWA experience keeps the map, voice orb and verdict usable on a 
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
  await expect(page.getByRole('link',{name:'Coverage & list view'})).toHaveAttribute('href','/');await page.getByRole('link',{name:'Coverage & list view'}).click();await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
 });
+
+test('a successful source refresh updates the verdict while other research jobs are pending',async({page})=>{
+ const venue={id:7001,name:'Synthetic research venue',area:'Bandra',address:'Synthetic fixture',latitude:19.0596,longitude:72.8295,cuisine:'Chinese',sample:false,source:'Synthetic fixture',phone:'',website:'',opening_hours:'Unknown',updated_at:'2026-11-13T00:00:00Z',rating:null};
+ const base={results:[],trace:[],parser:'Synthetic fixture',follow_up:'',nearby_unpriced:[],attribution:'',external_discovery:[],intent:{dish:'hakka noodles',max_budget:300,radius_km:2,location:'Bandra'}};
+ await page.route('**/api/search',route=>{const body=route.request().postDataJSON();return route.fulfill({json:body.research===false?{...base,results:[{restaurant:venue,dish:{id:7002,name:'Hakka noodles',price_paise:19950,source:'Synthetic publisher fixture',available:true,cuisine:'Chinese',category:'Main',description:''},distance_km:0,reason:'Synthetic source refresh',offers:[]}],verdict:{headline:'Synthetic refreshed verdict ₹199.50',match_count:1,explanation:'Synthetic test data',party_notice:null,mode_notice:'Confirm ordering mode',follow_ups:[]}}:{...base,research:body.query?{state:'queued',token:'synthetic-status-token',message:'Synthetic research queued'}:{state:'idle',message:''}}})});
+ await page.route('**/api/research/synthetic-status-token',route=>route.fulfill({json:{state:'running',succeeded:1,failed:0,message:'One source finished; another is pending'}}));
+ await page.goto('/');await page.getByLabel('Your food craving').fill('Hakka noodles under 300');await page.getByRole('button',{name:'Find my food',exact:true}).click();
+ await expect(page.getByText('Synthetic research queued',{exact:true})).toBeVisible();
+ await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('₹199.50',{timeout:15000});
+ await expect(page.getByRole('button',{name:'Synthetic research venue',exact:true})).toBeVisible();
+});

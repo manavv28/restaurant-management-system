@@ -19,3 +19,5 @@ Corrections:
 Regression tests prohibit citywide calculation from the production verdict path, check timestamped counter caching, validate stream headers and exercise research with additional unsourced nearby venues. Local PostgreSQL validation passed 216 tests, including the existing payment/concurrency, security, publication and migration checks. Hosted and post-deployment evidence are required before reporting the final performance result.
 
 The concierge stream also avoids an unrelated unpriced-directory lookup once priced matches exist; the directory remains available and the fallback still runs when no priced match exists. Search-match and run audit writes share the final commit on the priced fast path. After indexing, the same production coverage EXPLAIN measured about 2,007 ms instead of 9,903 ms; the aggregate is still kept out of verdicts.
+
+Research status polling refreshes the verdict after each newly successful source check, even if another job is retrying. It does not wait for every source to reach a terminal state. A browser regression covers a successful publication while the overall request remains running.
