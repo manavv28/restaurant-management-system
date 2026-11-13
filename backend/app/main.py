@@ -73,7 +73,8 @@ async def browser_security(request: Request, call_next):
     started=time.monotonic();request_id=uuid.uuid4().hex
     try:response = await call_next(request)
     except Exception:
-        logging.error('request_failed request_id=%s method=%s path=%s',request_id,request.method,request.url.path)
+        path='/research/[redacted]' if request.url.path.startswith(('/research/','/api/research/')) else request.url.path
+        logging.error('request_failed request_id=%s method=%s path=%s',request_id,request.method,path)
         from starlette.responses import JSONResponse
         return JSONResponse({'detail':'Request failed. Please try again.','request_id':request_id},status_code=500)
     response.headers['X-Request-ID']=request_id

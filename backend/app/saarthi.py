@@ -140,8 +140,9 @@ async def stream_search(body,user_id):
     async def finish_research():
         if RESEARCH_GATE.locked():return
         async with RESEARCH_GATE:
-            await run_research()
-    async def run_research():
+            from starlette.concurrency import run_in_threadpool
+            await run_in_threadpool(run_research)
+    def run_research():
         result=result_box
         # Work is persisted before starting network research. The worker also recovers queued jobs.
         if result and result.get('research',{}).get('token'):
@@ -149,7 +150,10 @@ async def stream_search(body,user_id):
             with Session() as db:row=db.get(ResearchRequest,claims['id']);ids=json.loads(row.job_ids) if row else []
             from .catalog_worker import run_one
             for job_id in ids:
-                try:await asyncio.wait_for(run_one(job_id=job_id),timeout=45)
+                # The worker uses synchronous SQLAlchemy and parsing between HTTP
+                # awaits. Give it a separate event loop in the background thread;
+                # otherwise these operations stall health/search/status requests.
+                try:asyncio.run(asyncio.wait_for(run_one(job_id=job_id),timeout=45))
                 except (Exception,asyncio.CancelledError):
                     from sqlalchemy import update
                     with Session() as db:

@@ -51,3 +51,15 @@ test('a successful source refresh updates the verdict while other research jobs 
  await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('₹199.50',{timeout:15000});
  await expect(page.getByRole('button',{name:'Synthetic research venue',exact:true})).toBeVisible();
 });
+
+test('immersive map remains visible while a search is waiting on the backend',async({page})=>{
+ let release:()=>void=()=>{};
+ const waiting=new Promise<void>(resolve=>{release=resolve});
+ await page.route('**/api/search',async route=>{await waiting;await route.fulfill({json:{results:[],trace:[],parser:'Synthetic delayed backend',follow_up:'',attribution:'',external_discovery:[]}})});
+ try {
+  await page.goto('/concierge');
+  await expect(page.getByLabel('Interactive restaurant map')).toBeVisible();
+  await expect(page.getByRole('button',{name:'Speak your craving'})).toBeVisible();
+  await expect(page.getByRole('status').filter({hasText:'Finding your next favourite'})).toBeVisible();
+ } finally {release();}
+});

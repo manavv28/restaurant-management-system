@@ -87,6 +87,30 @@ def test_missing_menu_research_persists_evidence_and_updates_the_lake(client,mon
     assert client.get('/admin/quality').status_code==401
 
 
+def test_slow_research_database_work_does_not_block_health_requests(client,monkeypatch):
+    import threading,time
+    from concurrent.futures import ThreadPoolExecutor
+    from app.database import Restaurant,CatalogSource
+    from app import catalog_worker
+    started=threading.Event();release=threading.Event()
+    async def slow_worker(job_id=None):
+        started.set()
+        release.wait(4)  # Models synchronous publication inside the async worker.
+    monkeypatch.setattr(catalog_worker,'run_one',slow_worker)
+    with Session() as db:
+        row=Restaurant(name='Synthetic slow research',address='Synthetic fixture',area='Bandra',latitude=19.0596,longitude=72.8295,cuisine='Chinese',sample=False)
+        db.add(row);db.flush()
+        db.add(CatalogSource(kind='approved_menu',url='https://menus.example.test/slow',restaurant_id=row.id,area='Bandra',permission_note='Synthetic reviewed fixture',enabled=True));db.commit()
+    with ThreadPoolExecutor(max_workers=1) as pool:
+        pending=pool.submit(client.post,'/query/stream',json={'query':'Hakka noodles under 300 in Bandra','include_samples':False})
+        try:
+            assert started.wait(3)
+            before=time.monotonic();health=client.get('/health');elapsed=time.monotonic()-before
+            assert health.status_code==200 and elapsed<1, 'Research blocked the API event loop'
+        finally:release.set()
+        assert pending.result(timeout=5).status_code==200
+
+
 def test_claim_is_pending_until_admin_checks_business_and_contact(client):
     from app.database import Restaurant
     with Session() as db:

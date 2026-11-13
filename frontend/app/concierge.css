@@ -68,7 +68,9 @@
 .immersive-discovery .hero,.immersive-discovery .reward-banner,.immersive-discovery footer,.immersive-discovery>.recovery-section { display:none; }
 .immersive-discovery .search-section { position:fixed; top:112px; left:50%; transform:translateX(-50%); margin:0; width:min(720px,85vw); z-index:650; }
 .immersive-discovery .discover-section { padding:0; }
-.immersive-discovery .discover-section>:not(.map-wrapper):not(.verdict-card):not(.live-agent-trace):not(.empty) { display:none; }
+.immersive-discovery .discover-section>:not(.map-wrapper):not(.verdict-card):not(.live-agent-trace):not(.empty):not(.concierge-loading) { display:none; }
+.immersive-discovery .concierge-loading { position:fixed; bottom:24px; left:24px; z-index:600; margin:0; padding:14px 18px; border-radius:18px; background:var(--cream); color:var(--ink); box-shadow:0 8px 30px #0003; }
+.immersive-discovery .discover-section:has(.live-agent-trace)>.concierge-loading { display:none; }
 .immersive-discovery .map-wrapper { position:fixed; inset:94px 0 0; z-index:0; }
 .immersive-discovery .map { height:100%; border-radius:0; border:0; }
 .immersive-discovery .map-warning { position:absolute; bottom:5px; left:15px; right:15px; max-width:400px; }
