@@ -21,6 +21,7 @@ class SearchInput(BaseModel):
     longitude: float | None = Field(default=None,ge=72.75,le=73.05)
     budget: int = Field(default=500,ge=1,le=100000)
     radius_km: float = Field(default=5,gt=0,le=50)
+    budget_scope: Literal['item','total'] | None = None
     include_samples: bool = True
     stream: bool = False
     research: bool = True
@@ -63,7 +64,13 @@ class MenuInput(BaseModel):
     price_paise: int = Field(ge=1,le=10000000)
     description: str = Field(default='',max_length=1000)
     available: bool = True
-    dietary: Literal['vegetarian','jain','halal'] | None = None
+    dietary: str | None = Field(default=None,max_length=80)
+    @field_validator('dietary')
+    @classmethod
+    def declared_dietary_labels(cls,value):
+        from .query_constraints import dietary_values
+        values=dietary_values(value)
+        return ','.join(values) or None
 class CampaignInput(BaseModel):
     title: str = Field(min_length=2,max_length=100)
     percent: int = Field(ge=1,le=80)

@@ -38,3 +38,19 @@ def test_migration_history_records_all_files(migrated):
     with migrated.connect() as db:
         rows=dict(db.execute(text('select name,sha256 from biteai_migrations')).all())
     assert rows=={f.name:hashlib.sha256(f.read_bytes()).hexdigest() for f in files.glob('*.sql')}
+
+
+def test_migrated_dietary_constraint_accepts_declared_combinations_and_rejects_other_claims(migrated):
+    from sqlalchemy.orm import Session
+    from sqlalchemy.exc import IntegrityError
+    from app.database import Restaurant,MenuItem
+    with Session(migrated) as db:
+        row=Restaurant(name='Isolated dietary migration fixture',address='Test Bandra address',area='Bandra',latitude=19.0596,longitude=72.8295,cuisine='Chinese',sample=False)
+        db.add(row);db.flush()
+        item=MenuItem(restaurant_id=row.id,name='Hakka noodles fixture',cuisine='Chinese',price_paise=20000,dietary='vegan,gluten-free')
+        db.add(item);db.flush()
+        assert db.get(MenuItem,item.id).dietary=='vegan,gluten-free'
+        with pytest.raises(IntegrityError):
+            with db.begin_nested():
+                item.dietary='healthy';db.flush()
+        db.rollback()

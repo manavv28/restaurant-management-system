@@ -17,5 +17,6 @@ test('listed prices retain paise, original date, context and source link',async(
  const modal=page.getByRole('dialog');
  await expect(modal).toContainText('₹199.50');await expect(modal).toContainText('2026-10-18');
  await expect(modal.getByRole('link',{name:'Contact source'})).toHaveAttribute('href','https://indiarestros.com/api/v1/restaurants/IRR-0000000001');await expect(modal).toContainText('Source listing');await expect(modal).toContainText('delivery listing');
+ await modal.getByText('Price source & freshness',{exact:true}).click();
  await expect(modal.getByRole('link',{name:'Price source'})).toHaveAttribute('href',dish.source_url);
 });

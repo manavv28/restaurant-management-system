@@ -28,7 +28,15 @@ def opening_status(hours,at=None):
     opened=start<=t<end if start<end else t>=start or t<end
     return {'open':opened,'label':('Listed open' if opened else 'Listed closed')+'; confirm with restaurant'}
 
-def continued_intent(query,intent,context):
+def continued_intent(query,intent,context,budget_scope=None):
+    from .query_constraints import scope_is_explicit
+    result=_continued_intent(query,intent,context)
+    if budget_scope is not None and not scope_is_explicit(query):
+        result=result.model_copy(update={'budget_scope':budget_scope})
+    return result
+
+
+def _continued_intent(query,intent,context):
     if not context:return intent
     if not re.search(r'isme|inme|aur sasta|sabse paas|nearest|closest|veg (?:only|wale)|cheaper|same|these|instead|ab |now in|only|total|delivery|dine|open now',query,re.I):return intent
     previous=Intent.model_validate(context)
@@ -37,7 +45,8 @@ def continued_intent(query,intent,context):
         if field=='dish' and intent.cuisine and intent.cuisine!=previous.cuisine:continue
         if field=='cuisine' and intent.dish and intent.dish!=previous.dish:continue
         if values[field] is None:values[field]=getattr(previous,field)
-    if not re.search(r'(?:under|below|budget|total|for|₹|rs\.?)\s*\d|\d+\s*(?:mein|tak|rupees)',q):values['max_budget']=previous.max_budget
+    from .query_constraints import money_limit
+    if money_limit(query) is None:values['max_budget']=previous.max_budget
     if not re.search(r'\d+(?:\.\d+)?\s*(?:km|kilomet)',q):values['radius_km']=previous.radius_km
     if 'delivery' not in q and 'dine' not in q:values['mode']=previous.mode
     if intent.party_size==1:values['party_size']=previous.party_size
@@ -48,6 +57,9 @@ def continued_intent(query,intent,context):
     if values['dish'] and any(term in values['dish'].casefold() for term in values['excluded_dishes']):values['dish']=None
     if values['cuisine'] in values['excluded_cuisines']:values['cuisine']=None
     if previous.walking_requested:values['walking_requested']=True
+    if not intent.dietary_constraints and intent.diet is None:values['dietary_constraints']=previous.dietary_constraints
+    if previous.unresolved_location and not intent.location and not intent.unresolved_location:
+        values['unresolved_location']=previous.unresolved_location
     return Intent.model_validate(values)
 
 def confidence(dish,restaurant):
@@ -57,9 +69,11 @@ def confidence(dish,restaurant):
         if date and not date.tzinfo:date=date.replace(tzinfo=timezone.utc)
         age=max(0,(datetime.now(timezone.utc)-date).days) if date else None
     except (ValueError,TypeError):age=None
+    retrieved=dish.get('source_retrieved_at')
     return {'level':'sample' if restaurant['sample'] else 'source-listed' if dish.get('source_expires_at') else 'owner-supplied',
             'label':'Fictional sample' if restaurant['sample'] else 'Source-listed · confirm current price' if dish.get('source_expires_at') else 'Owner-supplied · unverified',
-            'observed_at':observed,'age_days':age,'may_have_changed':age is None or age>30,
+            'observed_at':observed,'retrieved_at':retrieved,'age_days':age,'may_have_changed':age is None or age>7,
+            'freshness_notice':('Original price observation date unknown.' if age is None else f'Price observed {age} day'+('s' if age!=1 else '')+' ago.')+(' Retrieval does not reconfirm the price.' if retrieved else ''),
             'independently_verified':False}
 
 def verdict(data,intent):
@@ -86,7 +100,11 @@ def verdict(data,intent):
     if rows and not intent.dish and not intent.cuisine:headline='Explore listed menus near you.'
     alternatives=data.get('alternatives',[])
     if not rows and alternatives:headline=f"Cheapest listed {'subtotal' if intent.budget_scope=='total' else 'match'} ₹{alternatives[0].get('listed_subtotal_paise',alternatives[0]['price_paise'])/100:g}; budget se upar."
+    diets=list(dict.fromkeys([*intent.dietary_constraints,*([intent.diet] if intent.diet else [])]))
+    dietary_notice=('Only explicitly declared '+', '.join(diets)+' labels are matched. Ingredients and cross-contact need restaurant confirmation.') if diets else None
+    if not rows and diets:headline='No priced match with the requested dietary labels.'
     return {'alternatives':alternatives,'headline':headline,'match_count':len(rows),'top_ids':[r['restaurant']['id'] for r in rows[:3]],
+            'dietary_notice':dietary_notice,
             'explanation':'Top options match the dish, listed item price and straight-line radius. Confirm current price and availability with the restaurant.' if rows else 'The available catalogue has no priced match for these constraints. Missing data does not prove the dish is unavailable.',
             'budget_notice':'Final payable total is unconfirmed. Listed prices exclude unknown charges; discounts require eligibility and confirmation.',
             'distance_notice':'Distances are straight-line from the selected location, not walking routes or delivery coverage.'+(' Walking distance could not be verified.' if intent.walking_requested else ''),
@@ -133,7 +151,7 @@ async def stream_search(body,user_id):
         started=time.monotonic()
         try:
             intent,parser=await understand(body.query,body.budget,body.radius_km)
-            intent=continued_intent(body.query,intent,body.context)
+            intent=continued_intent(body.query,intent,body.context,body.budget_scope)
             emit('intent',{'agent':'Saarthi','intent':intent.model_dump(),'message':'Samjha: '+(intent.dish or intent.cuisine or 'nearby food')})
             def lookup():
                 from .main import search_database
@@ -216,7 +234,7 @@ def activity(db=Depends(db_session)):
     if failures:alerts.append('Some source checks failed. Their last observation is not a current restaurant quote.')
     if stalled:alerts.append('Worker leases are overdue; the next worker cycle will recover them.')
     if not last_success or last_success<(datetime.now(timezone.utc)-timedelta(hours=24)).isoformat():alerts.append('No successful collection in the last 24 hours. Check worker availability.')
-    return {'source_health':{'alerts':alerts,'latest_failed_sources':len(failures),'failure_categories':categories,'last_successful_collection':last_success,'stalled_jobs':stalled,'retry_policy':'3 attempts with exponential backoff; source review failures cool down for at least 24 hours. Work runs while the free service is awake.'},'jobs':dict(jobs),'agents':[{'id':r.id,'agent':r.agent,'state':r.status,'latency_ms':r.latency_ms,'cost_microrupees':r.cost_microrupees,'created_at':r.created_at,'execution':json.loads(r.summary).get('parser','Execution type not recorded')} for r in runs],
+    return {'source_health':{'alerts':alerts,'latest_failed_sources':len(failures),'failure_categories':categories,'last_successful_collection':last_success,'stalled_jobs':stalled,'retry_policy':'Transient failures: up to 3 attempts with exponential backoff. Invalid evidence, identity or access: source review and at least 24 hours cooldown. The web-service worker runs while awake; an external scheduler can run bounded batches.'},'jobs':dict(jobs),'agents':[{'id':r.id,'agent':r.agent,'state':r.status,'latency_ms':r.latency_ms,'cost_microrupees':r.cost_microrupees,'created_at':r.created_at,'execution':json.loads(r.summary).get('parser','Execution type not recorded')} for r in runs],
             'notice':'Actual recorded runs. No individual search text, account details or private platform responses are exposed.'}
 
 def admin(user=Depends(current_user)):
@@ -266,13 +284,3 @@ def review(mid:int,body:Review,user=Depends(admin),db=Depends(db_session)):
     evidence.active=body.decision=='approve';item.available=evidence.active
     db.add(IngestionLog(restaurant_id=item.restaurant_id,source='admin-quality-review',trace=json.dumps({'administrator_id':user.id,'menu_item_id':mid,'decision':body.decision,'note':body.note,'at':now()})));db.commit()
     return {'active':evidence.active,'notice':'Review changes visibility only; it does not establish restaurant verification.'}
-
-
-def save_bronze(db,source_id,html):
-    import hashlib
-    digest=hashlib.sha256(html.encode()).hexdigest();identifier=hashlib.sha256((str(source_id)+digest).encode()).hexdigest()
-    if db.get(BronzeArtifact,identifier):return
-    # Explicit bounded retention; never let public research consume the database quota.
-    if len(html.encode())>1_000_000:return
-    if (db.scalar(select(func.count()).select_from(BronzeArtifact)) or 0)>=50:return
-    db.add(BronzeArtifact(id=identifier,source_id=source_id,content_hash=digest,content=html));db.flush()

@@ -1,0 +1,38 @@
+name: BiteAI reviewed catalogue refresh
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '47 * * * *'
+permissions:
+  contents: read
+concurrency:
+  group: biteai-reviewed-catalogue
+  cancel-in-progress: false
+jobs:
+  collect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    environment: production-catalog
+    env:
+      DATABASE_URL: ${{ secrets.CATALOG_DATABASE_URL }}
+      GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
+      APPROVED_MENU_HOSTS: ${{ vars.APPROVED_MENU_HOSTS }}
+      PUBLISHER_MENU_HOSTS: ${{ vars.PUBLISHER_MENU_HOSTS }}
+      APP_ENV: production
+      AUTO_CREATE_SCHEMA: 'false'
+      SEED_SAMPLE_DATA: 'false'
+      ENABLE_PAYMENT_SIMULATION: 'false'
+      PYTHONPATH: backend
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: deploy/biteai-mvp
+      - name: Require operator-provided worker settings
+        run: |
+          test -n "$DATABASE_URL" || { echo 'Configure production-catalog secrets as described in docs/AUDIT_FIXES.md. No collection was performed.'; exit 1; }
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install -r backend/requirements.txt
+      - name: Run bounded existing-source collection
+        run: python -m app.catalog_worker --batch --max-jobs 100 --max-seconds 600

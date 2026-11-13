@@ -15,6 +15,9 @@ def locality_coverage(db):
     for phone in db.scalars(select(Restaurant.phone).where(Restaurant.sample.is_(False),Restaurant.phone!='')):
         normalized=business_phone(phone)
         contacts['mobile' if normalized and normalized[3] in '6789' else 'landline' if normalized else 'unclassified']+=1
+    priorities=sorted((row for row in areas if row['missing_menu_prices']),key=lambda row:(row['menu_coverage_percent'],-row['missing_menu_prices'],row['area']))
     return {'areas':sorted(areas,key=lambda row:row['area']), 'phone_types':contacts,
+            'collection_priorities':priorities[:10],'is_complete':False,
+            'coverage_basis':'Known public-source listings inside Mumbai City and Mumbai Suburban; no complete-city denominator is established.',
             'phone_type_notice':'Number-format classification only; public business contacts are not verified as active or WhatsApp-enabled.',
             'locality_notice':'Coverage is within assigned catalog localities, not a complete Mumbai census or a GPS radius.'}

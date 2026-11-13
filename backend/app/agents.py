@@ -13,13 +13,16 @@ PIZZA_SNACKS=('puff','puffs','mcpuff','pocket','pockets','sandwich','burger','fr
               'chips','toast','toasties','bomb','bombs','ball','balls','bite','bites','paratha',
               'uttapam','khakhra','nachos','rice','noodles','pasta')
 from .areas import AREAS
+from .query_constraints import normalize_amounts, money_limit, requested_location, dietary_requirements
 class Intent(BaseModel):
     cuisine: str | None = Field(default=None,max_length=100)
     dish: str | None = Field(default=None,max_length=150)
     max_budget: int = Field(default=500, ge=1, le=100000)
     radius_km: float = Field(default=5, gt=0, le=50)
     location: str | None = Field(default=None,max_length=80)
-    diet: Literal['vegetarian','jain','halal'] | None = None
+    diet: Literal['vegetarian','jain','halal','vegan','gluten-free'] | None = None
+    dietary_constraints: list[Literal['vegetarian','jain','halal','vegan','gluten-free']] = Field(default_factory=list,max_length=5)
+    unresolved_location: str | None = Field(default=None,max_length=80)
     open_now: bool = False
     mode: Literal['any','delivery','dine-in'] = 'any'
     party_size: int = Field(default=1,ge=1,le=20)
@@ -35,7 +38,7 @@ def distance_km(a, b, c, d):
     return 6371 * 2 * math.asin(math.sqrt(min(1,x)))
 
 def parse_local(query, budget=500, radius=5):
-    q = query.casefold()
+    q = normalize_amounts(query)
     for word,number in {'two':2,'three':3,'four':4,'five':5,'do':2,'teen':3,'chaar':4}.items():
         q=re.sub(r'\b'+word+r'(?=\s+(?:people|persons|pax|log|logon)\b)',str(number),q)
     aliases={'हक्का':'hakka','नूडल्स':'noodles','चाइनीज़':'chinese','चाइनीज':'chinese','चीनी':'chinese','बिरयानी':'biryani','पिज्जा':'pizza','वड़ा पाव':'vada pav','वडा पाव':'vada pav','डोसा':'dosa','बांद्रा':'Bandra','अंधेरी':'Andheri','सस्ता':'sasta','पास':'paas','शाकाहारी':'vegetarian','खुला':'khula','रुपये':'rupees','किमी':'km','किलोमीटर':'km'}
@@ -56,20 +59,17 @@ def parse_local(query, budget=500, radius=5):
     if cuisine in excluded_cuisines:cuisine=None
     dish = next((d for d in dishes if re.search(r'(?<!\w)'+re.escape(d)+r'(?!\w)',q) and d not in excluded_dishes and not any(x in d or d in x for x in excluded_dishes)), None)
     # A party size or a distance must never become a rupee amount.
-    money=None
-    for candidate in re.finditer(r'(?:under|below|budget(?: of)?|total|less than|for|₹|rs\.?)[\s₹]*(\d+)',q):
-        if not re.match(r'\s*(?:people|persons|pax|log|logon|km|kilomet)\b',q[candidate.end():]):
-            money=candidate;break
-    money=money or re.search(r'(\d+)\s*(?:mein|me\b|tak|ke andar|rupees|रुपये)',q)
+    money=money_limit(q)
     km = re.search(r'(\d+(?:\.\d+)?)\s*(?:km|kilomet)', q)
-    location = next((a for a in sorted(AREAS,key=len,reverse=True) if re.search(r"(?<!\w)"+re.escape(a.lower())+r"(?!\w)",q)), None)
+    location,unresolved_location=requested_location(q)
+    diets=dietary_requirements(q)
     if not dish and not cuisine and not excluded_dishes and not excluded_cuisines:
         custom=re.search(r'(?:craving|want|find|eat(?:ing)?|get)\s+(?:some\s+)?(.+?)(?=\s+(?:under|below|within|near|in)\b|$)',q)
         if custom and len(custom[1].split())<=5 and not any(c.lower()==custom[1].strip() for c in cuisines):dish=custom[1].strip(' .?!') or None
     people=re.search(r'(\d+)\s*(?:log|logon|people|persons|pax)',q) or re.search(r'group of\s*(\d+)\b',q) or re.search(r'for\s*(\d+)\s*(?:people|persons|pax)\b',q)
-    return Intent(cuisine=cuisine, dish=dish, max_budget=int(money[1]) if money else budget,
+    return Intent(cuisine=cuisine, dish=dish, max_budget=money if money is not None else budget,
                   radius_km=float(km[1]) if km else radius, location=location,
-                  diet='jain' if 'jain' in q else 'halal' if 'halal' in q else 'vegetarian' if re.search(r'(?<![\w-])(?:veg|vegetarian)(?!\w)',q) and not re.search(r'non[ -]?veg',q) else None,
+                  unresolved_location=unresolved_location,diet=diets[0] if diets else None,dietary_constraints=diets,
                   open_now=bool(re.search(r'open now|abhi.*khula|khula.*ho',q)),
                   mode='delivery' if 'delivery' in q else 'dine-in' if 'dine' in q else 'any',
                   party_size=int(people[1]) if people else 1,
@@ -77,6 +77,33 @@ def parse_local(query, budget=500, radius=5):
                   budget_scope='total' if re.search(r'\btotal\b|all[ -]in|including fees|fees (?:included|mila)|kul budget|कुल',q) else 'item',
                   walking_requested=bool(re.search(r'walking|walkable|paidal|पैदल',q)),
                   sort='price' if re.search(r'cheapest|sasta|saste|aur sasta',q) else 'distance' if re.search(r'nearest|closest|sabse paas',q) else 'recommended')
+
+def validated_proposal(query,fallback,proposal):
+    """Models may enrich intent, but cannot drop or widen explicit constraints."""
+    # Reject malformed provider output before enforcing the user's constraints;
+    # protection must not disguise an invalid model response as a successful one.
+    values=Intent.model_validate({**fallback.model_dump(),**proposal}).model_dump()
+    if money_limit(query) is not None:values['max_budget']=fallback.max_budget
+    if re.search(r'\d+(?:\.\d+)?\s*(?:km|kilomet)',normalize_amounts(query)):values['radius_km']=fallback.radius_km
+    if fallback.location or fallback.unresolved_location:
+        values['location']=fallback.location;values['unresolved_location']=fallback.unresolved_location
+    elif values.get('location'):
+        location=str(values['location'])
+        if location.casefold() not in query.casefold():values['location']=None
+        elif location not in AREAS:values['location']=None;values['unresolved_location']=location
+    if fallback.dietary_constraints:
+        values['dietary_constraints']=list(dict.fromkeys([*fallback.dietary_constraints,*values.get('dietary_constraints',[])]))
+        values['diet']=fallback.diet
+    if fallback.open_now:values['open_now']=True
+    if fallback.walking_requested:values['walking_requested']=True
+    from .query_constraints import scope_is_explicit
+    if scope_is_explicit(query):values['budget_scope']=fallback.budget_scope
+    if re.search(r'\d+\s*(?:people|persons|pax|log|logon)|group of\s*\d+',normalize_amounts(query)):
+        values['party_size']=fallback.party_size
+    for field in ('excluded_dishes','excluded_cuisines'):
+        values[field]=list(dict.fromkeys([*getattr(fallback,field),*values.get(field,[])]))[:10]
+    return Intent.model_validate(values)
+
 
 async def understand(query, budget, radius):
     fallback = parse_local(query, budget, radius)
@@ -91,7 +118,7 @@ async def understand(query, budget, radius):
                         'options':{'temperature':0,'num_predict':384}})
                     response.raise_for_status()
                     proposal=json.loads(response.json()['message']['content'])
-                    return Intent.model_validate({**fallback.model_dump(),**proposal}), 'Local model structured extraction'
+                    return validated_proposal(query,fallback,proposal), 'Local model structured extraction'
             except (httpx.HTTPError,ValueError,KeyError,TypeError):
                 log.warning('Local model unavailable; using deterministic parser')
                 return fallback,'local rules (local model unavailable)'
@@ -103,7 +130,7 @@ async def understand(query, budget, radius):
                 'contents':[{'parts':[{'text':query}]}], 'generationConfig':{'maxOutputTokens':256,'temperature':0,'responseMimeType':'application/json','responseJsonSchema':Intent.model_json_schema()}})
             r.raise_for_status()
             data = json.loads(r.json()['candidates'][0]['content']['parts'][0]['text'])
-            return Intent.model_validate({**fallback.model_dump(), **data}), 'Gemini structured extraction'
+            return validated_proposal(query,fallback,data), 'Gemini structured extraction'
     except (httpx.HTTPError, ValueError, KeyError, IndexError, TypeError):
         log.warning('Gemini unavailable; using deterministic parser')
         return fallback, 'local rules (Gemini unavailable)'
@@ -155,7 +182,12 @@ def menu_search(db, intent, lat, lng, include_samples=True):
             query=query.where(~func.lower(MenuItem.name).startswith(prefix,autoescape=True))
         for beverage in ('coffee','tea','lassi','juice','pepsi','coke','soda'):
             query=query.where(~padded.contains(' '+beverage+' ',autoescape=True))
-    if intent.diet:query=query.where(MenuItem.dietary==intent.diet)
+    # Each requested label must be explicitly declared. A vegetarian tag does
+    # not establish vegan or gluten-free suitability. Combinations are ANDed.
+    for diet in dict.fromkeys([*intent.dietary_constraints,*([intent.diet] if intent.diet else [])]):
+        declared=','+func.replace(func.lower(func.coalesce(MenuItem.dietary,'')),' ','')+','
+        allowed=('vegetarian','vegan','jain') if diet=='vegetarian' else (diet,)
+        query=query.where(or_(*(declared.contains(','+label+',',autoescape=True) for label in allowed)))
     eligible=candidates(db,query,lat,lng,intent.radius_km).subquery()
     rows=db.execute(select(eligible).where(eligible.c.choice==1)).mappings().all()
     ranked=[]
