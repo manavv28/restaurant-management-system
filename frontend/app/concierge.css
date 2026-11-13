@@ -99,3 +99,12 @@
  .immersive-discovery .leaflet-control-zoom a{width:36px;height:36px;line-height:36px}
  .immersive-discovery .leaflet-control-attribution{top:124px}
 }
+[data-theme="night"] .floating-note { background:#263b2a; color:#e5ece2; border-color:#40543c; }
+[data-theme="night"] .floating-note small { color:#b2c1ac; }
+[data-theme="night"] .tiny-pin { background:#3a502d; color:#d2e0bc; }
+[data-theme="night"] .brand-mark { color:#17251a; }
+[data-theme="night"] .cuisine-tag { background:#293e2d; color:#e1eaca; }
+[data-theme="night"] .close { background:#31442c; color:#e5ece2; }
+[data-theme="night"] .metric-grid>div { background:#1d3025; color:#e5ece2; border-color:#3a4e3b; }
+[data-theme="night"] .metric-grid small { color:#b2c1ac; }
+.sample-badge { color:#725524; }
