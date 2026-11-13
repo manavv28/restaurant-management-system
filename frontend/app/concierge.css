@@ -89,3 +89,13 @@
 @media(max-width:760px) { .voice-orb{width:62px;height:62px;bottom:calc(38dvh + 18px)} }
 @media(prefers-reduced-motion:reduce) { .orb-listening{animation:none} }
 @media(max-width:760px) { .immersive-discovery .map-warning{display:block;position:absolute;top:263px;bottom:auto;left:12px;right:auto;max-width:220px;font-size:10px;padding:9px} }
+[data-theme="night"] .leaflet-container { background-color:#12241b!important; background-image:linear-gradient(#31513c44 1px,transparent 1px),linear-gradient(90deg,#31513c44 1px,transparent 1px); }
+.immersive-discovery .leaflet-top.leaflet-left { top:78px; }
+.immersive-discovery .leaflet-control-attribution { position:fixed; top:94px; bottom:auto; right:0; font-size:9px; }
+@media(max-width:760px) {
+ .immersive-toolbar{top:405px;left:auto;right:12px}
+ .immersive-discovery .map-warning{max-width:140px;font-size:9px}
+ .immersive-discovery .leaflet-top.leaflet-left{top:315px;left:auto;right:12px}
+ .immersive-discovery .leaflet-control-zoom a{width:36px;height:36px;line-height:36px}
+ .immersive-discovery .leaflet-control-attribution{top:124px}
+}

@@ -38,5 +38,5 @@ test('immersive PWA experience keeps the map, voice orb and verdict usable on a 
  await expect(page.getByRole('region',{name:'Your food verdict'})).toContainText('₹240');
  await expect(page.locator('.leaflet-interactive').first()).toBeVisible();
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
- await expect(page.getByRole('link',{name:'Coverage & list view'})).toHaveAttribute('href','/');
+ await expect(page.getByRole('link',{name:'Coverage & list view'})).toHaveAttribute('href','/');await page.getByRole('link',{name:'Coverage & list view'}).click();await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
 });

@@ -107,3 +107,20 @@ def test_above_budget_alternative_is_not_returned_as_a_budget_match(client):
     assert data['alternatives'][0]['price_paise']==24000
     assert 'budget se upar' in data['verdict']['headline']
     assert data['alternatives'][0]['price_paise']>data['intent']['max_budget']*100
+
+
+def test_ai_proposals_need_operator_review_and_expired_prices_cannot_be_approved(client):
+    from app.database import Restaurant,CatalogSource,MenuEvidence
+    from app.catalog import persist_menu
+    operator=account(client,'quality-operator@example.test')
+    with Session() as db:
+        user=db.scalar(select(User).where(User.email=='quality-operator@example.test'));user.role='admin'
+        row=Restaurant(name='Synthetic AI review fixture',address='Synthetic Bandra fixture',area='Bandra',latitude=19.0596,longitude=72.8295,cuisine='Chinese',sample=False);db.add(row);db.flush()
+        source=CatalogSource(kind='approved_menu',url='https://menus.example.test/food',restaurant_id=row.id,area='Bandra',permission_note='Synthetic publisher fixture',enabled=True);db.add(source);db.flush()
+        persist_menu(db,source,'Hakka noodles INR 199',[{'name':'Hakka noodles','price_paise':19900,'excerpt':'Hakka noodles INR 199','method':'Gemini + exact evidence validation'}]);db.commit()
+        mid=db.scalar(select(MenuItem.id).where(MenuItem.restaurant_id==row.id));assert not db.get(MenuEvidence,mid).active
+    assert client.post('/search',json={'query':'Hakka noodles under 300','include_samples':False}).json()['results']==[]
+    assert client.post('/admin/quality/'+str(mid),headers=operator,json={'decision':'approve','note':'Synthetic source evidence reviewed'}).status_code==200
+    assert client.post('/search',json={'query':'Hakka noodles under 300','include_samples':False}).json()['results']
+    with Session() as db:db.get(MenuEvidence,mid).expires_at=(datetime.now(timezone.utc)-timedelta(days=1)).isoformat();db.commit()
+    assert client.post('/admin/quality/'+str(mid),headers=operator,json={'decision':'approve','note':'Expired observations cannot be revived'}).status_code==409

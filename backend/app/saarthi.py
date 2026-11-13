@@ -65,6 +65,7 @@ def verdict(data,intent):
                                'swiggy':'https://www.swiggy.com/search?'+urlencode({'query':text}),
                                'presence':'Not checked; links search the platforms'}
     headline=(f"Haan, ₹{rows[0]['dish']['price_paise']/100:g} ka listed option mila." if rows else 'Abhi confirmed priced match nahi mila.')
+    if rows and not intent.dish and not intent.cuisine:headline='Explore listed menus near you.'
     alternatives=data.get('alternatives',[])
     if not rows and alternatives:headline=f"Cheapest listed match ₹{alternatives[0]['price_paise']/100:g}; budget se upar."
     return {'alternatives':alternatives,'headline':headline,'match_count':len(rows),'top_ids':[r['restaurant']['id'] for r in rows[:3]],
@@ -195,7 +196,8 @@ def review(mid:int,body:Review,user=Depends(admin),db=Depends(db_session)):
     evidence=db.scalar(select(MenuEvidence).where(MenuEvidence.menu_item_id==mid).with_for_update());item=db.get(MenuItem,mid)
     if not evidence or not item:raise HTTPException(404,'Source-backed menu item not found')
     if body.decision=='approve' and evidence.expires_at<=now():raise HTTPException(409,'Expired prices require a new source observation before approval')
-    evidence.active=body.decision=='approve'
+    if body.decision=='approve' and not evidence.active and not evidence.method.startswith('Gemini'):raise HTTPException(409,'Withdrawn source prices require a new source observation')
+    evidence.active=body.decision=='approve';item.available=evidence.active
     db.add(IngestionLog(restaurant_id=item.restaurant_id,source='admin-quality-review',trace=json.dumps({'administrator_id':user.id,'menu_item_id':mid,'decision':body.decision,'note':body.note,'at':now()})));db.commit()
     return {'active':evidence.active,'notice':'Review changes visibility only; it does not establish restaurant verification.'}
 

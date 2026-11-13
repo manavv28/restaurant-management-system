@@ -257,7 +257,7 @@ def search_database(body,intent,parser,user,db,progress=None):
     data['alternatives']=alternatives
     data['verdict']=verdict(data,intent)
     data['research']=request_research(db,search_record,data,body,intent) if body.research and body.stream and not unique else {'state':'not_needed' if unique else 'idle','message':'Cached catalogue answer'}
-    db.add(AgentRun(id=uuid.uuid4().hex,agent='Saarthi',status='succeeded',search_id=search_record.id,summary=json.dumps({'tools':['parse_intent','geo_menu_search','source_attribution','campaign_eligibility'],'matches':len(unique)}),latency_ms=int((time.monotonic()-started)*1000),cost_microrupees=None if parser.startswith('Gemini') else 0));db.commit()
+    db.add(AgentRun(id=uuid.uuid4().hex,agent='Saarthi',status='succeeded',search_id=search_record.id,summary=json.dumps({'tools':['parse_intent','geo_menu_search','source_attribution','campaign_eligibility'],'matches':len(unique)}),latency_ms=int((time.monotonic()-started)*1000),cost_microrupees=None if os.getenv('GEMINI_API_KEY') else 0));db.commit()
     return data
 
 @app.post('/query/stream')
