@@ -1,13 +1,13 @@
 # Remaining work against the user's original BiteAI brief
 
-Verified 13 November 2026 (India), application release `082b9205c959`. This checklist separates working software from actual coverage and live-provider evidence. It does not certify full production readiness.
+Verified 13 November 2026 (India), application release `b317cefc3bfa`. This checklist separates working software from actual coverage and live-provider evidence. It does not certify full production readiness.
 
 ## Voice/text food discovery
 
 - [x] Text search, Mumbai area/GPS selection, budget and radius filtering, ranking, restaurant details and menus.
 - [x] Browser voice controls and text fallback, including automated voice-adapter tests.
 - [ ] Actual microphone transcription on a supported user phone/browser.
-- [ ] Live AI interpretation: add GEMINI_API_KEY securely in Render and verify a real structured model response. Rules-based extraction currently works; enabling a key does not add unsupported dietary data or filters.
+- [ ] Live AI interpretation: add GEMINI_API_KEY securely in Render and verify a real structured model response. Hinglish/Devanagari rules, context, explicit dietary and supported-hour filters work; a key cannot supply unknown menu facts.
 
 ## “All restaurants, menus and mobiles in Mumbai”
 
@@ -20,13 +20,10 @@ Verified 13 November 2026 (India), application release `082b9205c959`. This chec
 
 ## Zomato and Swiggy
 
-- [x] Official endpoint research, observed OAuth metadata/401 challenges and successful callback client registration requests.
-- [x] User-reported approvals recorded; deployed per-user connection/disconnect controls and encrypted credential storage.
-- [x] Read-only Swiggy restaurant/menu adapter, selection-bound menu requests, stock/radius checks and safe unknown prices.
-- [ ] Actual end-user account consent and authenticated read verification for both providers. Use the app's **Check Zomato and Swiggy** panel; enter login/OTP only on the providers' pages.
-- [ ] Confirm Swiggy's actual price units before enabling budget comparisons. Unknown units and ambiguous variants remain unconfirmed.
-- [ ] Validate Zomato's authenticated tool schema and finish its restaurant/menu mapping. Schema metadata is captured privately after account connection; live business search is not yet claimed.
-- [ ] Any bulk catalogue export/storage requires the appropriate provider agreement. A working user-scoped MCP connection does not establish unrestricted data-lake rights.
+- [x] Contextual platform-browsing links and per-match search links are available; external current prices/availability are checked on those websites.
+- [x] Official endpoint/OAuth spike and encrypted per-user adapter implementation are retained but disabled in production after actual Swiggy whitelist and Zomato OTP failures. Cutting this optional spike follows the uploaded PRD.
+- [ ] Provider-side approval/working consent, authenticated schema/units verification and Zomato menu mapping before enabling account reads. A callback registration or reported connection does not prove an actual account read; none is claimed.
+- [ ] Any bulk catalogue export/storage needs the applicable provider agreement. Browse links do not import platform menus into the lake.
 
 ## Agents do the busywork
 
@@ -37,7 +34,8 @@ Verified 13 November 2026 (India), application release `082b9205c959`. This chec
 
 ## Custom discounts based on searches or spending
 
-- [x] Restaurant portal, campaigns, query-count/spend eligibility, limits, validity, redemption tracking and auditable calculations.
+- [x] Restaurant portal, claims/review, owner-approved offer copilot, tiers, unique-query credits, cuisine conditions, weekly/daily budgets and auditable eligibility.
+- [x] Test-only signed capture, QR vouchers and once-only redemption/refund/dispute logic; sandbox amounts never increase verified real spend.
 - [x] Payment-data consent, withdrawal and authorised gateway/webhook architecture; purchase history is not inferred from searches.
 - [ ] Actual merchant onboarding, gateway test credentials and verified capture/refund/dispute tests before real spending-based offers.
 - [ ] Validate real campaigns/redemptions with participating restaurants.
@@ -53,7 +51,9 @@ Operational follow-ups such as encrypted production recovery and incident-alert 
 ## Presentation and release verification
 
 - [x] Consistent styled controls, clear provider connection badges, responsive directory results, readable mobile cards, visible keyboard focus and request/disabled states.
-- [x] Latest hosted validation: 99 backend tests plus one PDF skip, 29 browser journeys, production builds, migrated database smoke and two public-release checks.
+- [x] Latest hosted validation: 216 backend tests plus one PDF skip, 35 browser journeys, production builds, migrated database smoke and three public-release checks.
 - [x] Original Haka-noodles/₹300/2 km request verified against the public catalogue, with source attribution and explicit reference-price limits.
 
 These completions do not change the open data/integration requirements above. See [IMPLEMENTATION_VERIFICATION.md](IMPLEMENTATION_VERIFICATION.md).
+
+The uploaded PRD adds further targets and P1/P2 scope. See [PRD_TRACEABILITY.md](PRD_TRACEABILITY.md) and the current [completion checklist](COMPLETION_CHECKLIST.md); neither exhaustive coverage nor every PRD verification is complete.

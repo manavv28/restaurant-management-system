@@ -1,5 +1,7 @@
 # Zomato and Swiggy account connections
 
+**Current MVP state (13 November 2026):** both `SWIGGY_MCP_ENABLED` and `ZOMATO_MCP_ENABLED` are **false**. The actual whitelist/OTP failures below cut this optional spike from the enabled PRD MVP. Contextual Browse links remain available. The implementation and activation notes below describe a disabled adapter, not working authenticated provider access. Do not keep retrying consumer login until the provider-side blocker is resolved.
+
 BiteAI uses official MCP endpoints rather than undocumented consumer APIs. The user reported approval for both integrations. Live discovery verified both providers' OAuth metadata and unauthenticated HTTP 401 challenges; public client registration accepted BiteAI's callback request (Swiggy 201, Zomato 200). Registration is not proof that end-user login, data access or price comparison succeeded.
 
 ## What is implemented

@@ -4,7 +4,7 @@ The application is deployed at https://restaurant-management-system-qxtx.vercel.
 
 ## Information you can provide in chat
 
-1. **Discovery/menu sources:** the permitted public catalogue currently contains 10,404 listings, 357,694 source-listed prices across 2,613 restaurants and 8,747 contact numbers. Coverage remains partial. Official Zomato/Swiggy account links are deployed; the user reported approvals and both client registrations accepted callback requests, but end-user OAuth remains unverified. Use **Connect Zomato** and **Connect Swiggy** inside BiteAI; Browse links open websites and do not link accounts. See [PLATFORM_CONNECTIONS.md](PLATFORM_CONNECTIONS.md) and [USER_BRIEF_CHECKLIST.md](USER_BRIEF_CHECKLIST.md). Google Places is an optional additional discovery source, not a requirement for the existing public-source catalogue.
+1. **Discovery/menu sources:** the permitted public catalogue currently contains 10,404 listings, 357,694 source-listed prices across 2,613 restaurants and 8,747 contact numbers. Coverage remains partial. Contextual Zomato/Swiggy Browse links open their websites. The optional account-connect spike is disabled following actual provider whitelist/OTP blocks; authenticated reads remain unverified. Provider approval is needed before re-enabling it, not for using the external browsing links. See [PLATFORM_CONNECTIONS.md](PLATFORM_CONNECTIONS.md) and [USER_BRIEF_CHECKLIST.md](USER_BRIEF_CHECKLIST.md). Google Places is an optional additional discovery source, not a requirement for the existing public-source catalogue.
 2. **Email sender:** selected Gmail address **letsbiteai@gmail.com**. Gmail App Password is configured, and the authenticated HTTPS relay is active. Gmail accepted the operator test; inbox receipt and actual verification/reset completion remain pending. See [EMAIL_DELIVERY.md](EMAIL_DELIVERY.md).
 3. **Alert recipient:** selected **letsbiteai@gmail.com**. Incident-alert delivery still needs an actual verified notification. The working security-mail relay does not by itself establish that a scheduled alert was delivered.
 4. **Backup destination:** selected encrypted GitHub artifacts retained seven days; protected production backup/restore is still unverified. Workflow, secure secret names, recovery instructions and default-branch scheduling requirement are in [BACKUPS.md](BACKUPS.md). Keep the decryption secret separately from backup files.
@@ -70,3 +70,9 @@ The completed restore rehearsal used isolated catalog data. It does not establis
 - Create an encrypted production backup, restore into an isolated target, compare records, and document recovery/retention.
 
 A real microphone transcription check also requires a supported end-user browser and microphone permission; automated voice adapter/fallback tests already pass.
+
+## PRD merchant/operator verification
+
+Identify the genuine administrator account and participating restaurant before assigning privileged roles or approving claims. The sender email alone does not establish either identity. A claim requires independent business/contact checks, while payment onboarding and website-control verification remain separate. Phone-OTP verification requires an SMS provider and secure configuration; none is currently certified.
+
+For receipt/Account Aggregator follow-up work, identify the consent-based provider and supported transaction-verification contract first. Do not collect UPI PINs, account passwords or OTPs. A screenshot/receipt and customer confirmation are not independently verified funds.

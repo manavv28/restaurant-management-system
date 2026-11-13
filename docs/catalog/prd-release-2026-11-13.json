@@ -1,0 +1,109 @@
+{
+  "application_release": "b317cefc3bfab3824f2d8388abe91965f2190531",
+  "verified_date": "2026-11-13",
+  "frontend": "https://restaurant-management-system-qxtx.vercel.app",
+  "backend": "https://biteai-demo.onrender.com",
+  "hosting": {
+    "backend_plan": "Render Free",
+    "database": "Supabase PostgreSQL",
+    "tls": "verify-full"
+  },
+  "deployment": {
+    "render": "dep-dbre5q0u01pc73avurj0",
+    "vercel": "dpl_3o4YwdQjUmtWLRjXcNL17zVa3cA3"
+  },
+  "validation": {
+    "integration_run": 43407550923,
+    "public_run": 43407550899,
+    "backend_passed": 216,
+    "backend_skipped_native_pdf": 1,
+    "browser_journeys_passed": 35,
+    "public_checks_passed": 3,
+    "migrations": 12,
+    "production_frontend_build": "passed",
+    "production_container_build_and_database_smoke": "passed"
+  },
+  "catalogue": {
+    "real_venues": 10404,
+    "fictional_samples": 0,
+    "available_source_listed_prices": 357694,
+    "venues_with_prices": 2613,
+    "venues_without_prices": 7791,
+    "public_contact_numbers": 8747,
+    "missing_contact_numbers": 1657,
+    "explicit_dietary_labels_after_research": 368,
+    "exhaustive_mumbai_census": false,
+    "prices_independently_restaurant_verified": false
+  },
+  "live_research": {
+    "responsiveness_release": "7128e15efd4d",
+    "successful_job_ids": [
+      78,
+      79,
+      80,
+      81,
+      82,
+      83
+    ],
+    "post_fix_job_ids": [
+      81,
+      82,
+      83
+    ],
+    "all_concurrent_health_and_status_probes_http_200": true,
+    "status_proxy_resets_in_post_fix_probe": 0
+  },
+  "warm_specific_query_probe": {
+    "release": "011cb8532a8b",
+    "sample_size": 5,
+    "median_verdict_ms": 1900,
+    "median_first_event_ms": 835,
+    "representative_p95_or_100_user_certification": false
+  },
+  "health": {
+    "https://restaurant-management-system-qxtx.vercel.app": {
+      "release": "b317cefc3bfa",
+      "database_provider": "Supabase",
+      "database_tls": "verify-full",
+      "retention_worker": true,
+      "status": "ok",
+      "database": "connected",
+      "parser": "local rules",
+      "google_places": false,
+      "payments": "provider unavailable",
+      "payment_simulation": false
+    },
+    "https://biteai-demo.onrender.com": {
+      "release": "b317cefc3bfa",
+      "database_provider": "Supabase",
+      "database_tls": "verify-full",
+      "retention_worker": true,
+      "status": "ok",
+      "database": "connected",
+      "parser": "local rules",
+      "google_places": false,
+      "payments": "provider unavailable",
+      "payment_simulation": false
+    }
+  },
+  "remaining_work": "../COMPLETION_CHECKLIST.md",
+  "live_provider_account_reads_verified": false,
+  "live_microphone_wer_verified": false,
+  "real_gateway_sandbox_transaction_verified": false,
+  "protected_production_backup_restore_verified": false,
+  "full_prd_complete": false,
+  "demo": {
+    "path": "../demo/biteai-prd-demo.mp4",
+    "duration_seconds": 126.92,
+    "page_errors": 0,
+    "scope": "Real public catalogue/map/text-verdict/follow-up/menu/Agent Wall; no microphone transcription, merchant payment or external login certification",
+    "managed_browser_fetch_interception_buffers_streams": true
+  },
+  "post_release_log_scan": {
+    "start_utc": "2026-11-13T10:15:58Z",
+    "end_utc": "2026-11-13T10:18:24Z",
+    "request_failed_entries": 0,
+    "socket_hang_up_entries": 0,
+    "continuous_monitoring": false
+  }
+}
