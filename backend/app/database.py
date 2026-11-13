@@ -343,3 +343,7 @@ class RestaurantClaim(Base):
     review_note: Mapped[str] = mapped_column(Text,default='')
     reviewed_by: Mapped[int | None] = mapped_column(ForeignKey('users.id'),nullable=True)
     created_at: Mapped[str] = mapped_column(String(40),default=now)
+
+Index('ix_menu_items_available_coverage',MenuItem.id,postgresql_include=['restaurant_id'],postgresql_where=MenuItem.available.is_(True)).ddl_if(dialect='postgresql')
+Index('ix_menu_evidence_active_coverage',MenuEvidence.menu_item_id,postgresql_include=['expires_at'],postgresql_where=MenuEvidence.active.is_(True)).ddl_if(dialect='postgresql')
+Index('ix_catalog_identities_observed_at',CatalogIdentity.observed_at).ddl_if(dialect='postgresql')

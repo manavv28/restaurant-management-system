@@ -1,4 +1,5 @@
 import json, os, uuid, logging
+import threading,time as clock
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from fastapi import FastAPI, Depends, HTTPException, Request, Response
@@ -78,7 +79,7 @@ async def browser_security(request: Request, call_next):
     response.headers['X-Request-ID']=request_id
     if response.status_code>=500:logging.error('request_error request_id=%s status=%s elapsed_ms=%d',request_id,response.status_code,int((time.monotonic()-started)*1000))
     if request.url.path.startswith(('/auth','/me','/portal','/payments','/platforms','/admin','/partner','/research','/query','/search')):
-        response.headers['Cache-Control'] = 'no-store'
+        response.headers.setdefault('Cache-Control','no-store')
     if request.url.path.startswith('/platforms'):response.headers['Referrer-Policy']='no-referrer'
     return response
 
@@ -246,7 +247,7 @@ def search_database(body,intent,parser,user,db,progress=None):
     emit('offers_applied',{'agent':'Saudagar','message':'Offer eligibility checked','offers':sum(len(r['offers']) for r in unique)})
     data={'external_discovery':[],'attribution':attribution(search_record),'intent':intent,'results':unique,'trace':trace,'parser':parser,'follow_up': ('No matching priced menu was found. Try a larger radius or budget, or another dish.' if body.query and not unique else None) or ('What dish or cuisine are you craving? Try “Hakka noodles under ₹300 within 2 km”.' if body.query and not intent.dish and not intent.cuisine else None),
             'coverage':'Partial Mumbai coverage; source-observed prices require confirmation. Samples are fictional.',
-            'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km), 'catalog':catalog_coverage(db)}
+            'nearby_unpriced':unpriced_nearby(db,lat,lng,intent.radius_km), 'catalog':dict(_coverage_snapshot['data']) if os.getenv('APP_ENV')=='production' and _coverage_snapshot.get('data') else None if os.getenv('APP_ENV')=='production' else catalog_coverage(db)}
     alternatives=[]
     if not unique and (intent.dish or intent.cuisine):
         above=menu_search(db,intent.model_copy(update={'max_budget':100000,'sort':'price'}),lat,lng,body.include_samples)[:3]
@@ -483,15 +484,26 @@ def profile(body:ProfileInput,user=Depends(current_user),db=Depends(db_session))
     db.commit()
     return {**public(user),'preferred_cuisine':preference.preferred_cuisine}
 
+_coverage_snapshot={}
+_coverage_lock=threading.Lock()
+
 @app.get('/catalog/coverage')
 def catalog_coverage(db=Depends(db_session)):
+    if os.getenv('APP_ENV')!='production':return calculate_coverage(db)
+    if _coverage_snapshot.get('data') and clock.monotonic()-_coverage_snapshot['stored_at']<60:return dict(_coverage_snapshot['data'])
+    with _coverage_lock:
+        if _coverage_snapshot.get('data') and clock.monotonic()-_coverage_snapshot['stored_at']<60:return dict(_coverage_snapshot['data'])
+        data=calculate_coverage(db);_coverage_snapshot.update(data=data,stored_at=clock.monotonic());return dict(data)
+
+def calculate_coverage(db):
+    snapshot_at=now()
     real_counts=select(func.count().filter(Restaurant.sample.is_(False)).label('real_restaurants'),func.count().filter(Restaurant.sample.is_(True)).label('sample_restaurants'),func.count().filter(Restaurant.sample.is_(False),Restaurant.phone!='').label('public_phone_restaurants')).subquery()
     price_counts=select(func.count(MenuEvidence.menu_item_id).label('fresh_source_menu_items'),func.count(func.distinct(MenuItem.restaurant_id)).label('source_priced_restaurants')).select_from(MenuEvidence).join(MenuItem,MenuItem.id==MenuEvidence.menu_item_id).join(Restaurant,Restaurant.id==MenuItem.restaurant_id).where(MenuItem.available.is_(True),Restaurant.sample.is_(False),MenuEvidence.active.is_(True),MenuEvidence.expires_at>now()).subquery()
     source_counts=select(func.count().filter(CatalogSource.enabled.is_(True)).label('enabled_sources'),func.max(CatalogSource.checked_at).label('last_source')).subquery()
     statement=select(real_counts,price_counts,source_counts,select(func.max(CatalogIdentity.observed_at)).scalar_subquery().label('last_identity')).select_from(real_counts.join(price_counts,text('true')).join(source_counts,text('true')))
     counts=dict(db.execute(statement).mappings().one())
     last=max((value for value in (counts.pop('last_source'),counts.pop('last_identity')) if value),default=None)
-    return {**counts,'phone_coverage_percent':round(100*counts['public_phone_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'last_successful_collection':last,
+    return {**counts,'snapshot_at':snapshot_at,'cache_max_age_seconds':60 if os.getenv('APP_ENV')=='production' else 0,'phone_coverage_percent':round(100*counts['public_phone_restaurants']/counts['real_restaurants'],1) if counts['real_restaurants'] else 0,'last_successful_collection':last,
             'coverage':'Mumbai City and Mumbai Suburban listings; coverage is not exhaustive. Prices are published observations, not real-time restaurant quotes. Third-party listings may be dated and differ for delivery, portions or fees; source dates are shown where available.',
             'attribution':'Menu listing facts when present: IndiaRestros and its named sources (public API terms). Place sources: Overture Maps contributors (CDLA Permissive 2.0, Apache 2.0, CC0); © OpenStreetMap contributors (ODbL). See data sources for notices.'}
 
