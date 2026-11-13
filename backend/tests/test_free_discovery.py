@@ -63,7 +63,7 @@ def test_free_local_model_adapter_validates_schema_and_falls_back(monkeypatch):
         return httpx.Response(200,json={'message':{'content':json.dumps({'dish':'hakka noodles','max_budget':275})}})
     monkeypatch.setattr(httpx,'AsyncClient',lambda **kw:original(transport=httpx.MockTransport(handler),**kw))
     intent,parser=asyncio.run(understand('noodles under 300',500,5))
-    assert intent.max_budget==275 and parser=='Local model structured extraction'
+    assert intent.max_budget==300 and intent.dish=='hakka noodles' and parser=='Local model structured extraction'
     def invalid(request):return httpx.Response(200,json={'message':{'content':'{"max_budget":-1}'}})
     monkeypatch.setattr(httpx,'AsyncClient',lambda **kw:original(transport=httpx.MockTransport(invalid),**kw))
     intent,parser=asyncio.run(understand('noodles under 300',500,5))

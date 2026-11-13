@@ -3,14 +3,16 @@ import argparse
 import asyncio
 import json
 import logging
+import time
 from email.utils import parsedate_to_datetime
 from datetime import datetime, timedelta, timezone
 import httpx
-from sqlalchemy import select, update,func
+from sqlalchemy import select, update,func,case
 from sqlalchemy.exc import IntegrityError
 from .database import Base, engine, Session, CatalogSource, CatalogJob, now
 from .catalog import future, discover_osm, import_osm, fetch_menu, structured_menu, ai_menu, persist_menu, OSM_URL
 from .agents import AREAS
+from .evidence_storage import save_bronze
 
 # UI search coverage must never silently expand public-provider collection.
 DEFAULT_OSM_AREAS=('Bandra','Andheri','Powai','Colaba','Dadar')
@@ -38,7 +40,14 @@ def retry_delay_hours(exc,attempts):
 def retry_cooldown(source,latest):
     # Repeated extraction/identity/robots failures need source review, not an hourly storm.
     review=latest.error and any(word in latest.error.lower() for word in ('robots','unambiguous','identity','different brand','different area','disabled','unsupported','http 403','http 404','http 410'))
+    try:review=review or any(step.get('tool')=='source_review_required' for step in json.loads(latest.trace or '[]'))
+    except (ValueError,TypeError,AttributeError):pass
     return max(24,source.refresh_hours) if review else 6
+
+
+def requires_review(exc):
+    """Invalid evidence/identity/access is not a transient transport failure."""
+    return isinstance(exc,ValueError) or (isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code in (400,401,403,404,410,422))
 
 
 def schedule(db):
@@ -54,6 +63,7 @@ def schedule(db):
         if source.checked_at and source.checked_at>=(datetime.now(timezone.utc)-timedelta(hours=source.refresh_hours)).isoformat():continue
         if db.scalar(select(CatalogJob.id).where(CatalogJob.source_id==source.id,CatalogJob.state.in_(['queued','running']))):continue
         latest=db.scalar(select(CatalogJob).where(CatalogJob.source_id==source.id).order_by(CatalogJob.id.desc()).limit(1))
+        if latest and latest.state=='failed' and latest.available_at>now():continue
         if latest and latest.state=='failed' and latest.finished_at and latest.finished_at>=(datetime.now(timezone.utc)-timedelta(hours=retry_cooldown(source,latest))).isoformat():continue
         db.add(CatalogJob(source_id=source.id))
         try:db.commit();queued+=1
@@ -64,9 +74,9 @@ async def run_one(job_id=None):
     with Session() as db:
         # Recover leases after a worker crash. Three attempts max.
         stale=(datetime.now(timezone.utc)-timedelta(minutes=10)).isoformat()
-        for row in db.scalars(select(CatalogJob).where(CatalogJob.state=='running',CatalogJob.started_at<stale)):
-            row.state='queued' if row.attempts<3 else 'failed';row.error='Worker lease expired'
-            if row.state=='failed':row.finished_at=now()
+        db.execute(update(CatalogJob).where(CatalogJob.state=='running',CatalogJob.started_at<stale).values(
+            state=case((CatalogJob.attempts<3,'queued'),else_='failed'),error='Worker lease expired',
+            finished_at=case((CatalogJob.attempts>=3,now()),else_=CatalogJob.finished_at)))
         db.commit()
         candidates=db.scalars(select(CatalogJob).where(CatalogJob.state=='queued',CatalogJob.available_at<=now()).where(CatalogJob.id==job_id if job_id else True).order_by(CatalogJob.id).limit(20)).all()
         job=None
@@ -100,7 +110,6 @@ async def run_one(job_id=None):
                 trace.append({'agent':'Public menu API','tool':'attributed_INR_price_facts','output':result})
             elif source.kind=='approved_menu':
                 html=await fetch_menu(source);observed_url=source.url
-                from .saarthi import save_bronze
                 save_bronze(db,source.id,html);db.commit()
                 trace.append({'agent':'Collection','tool':'approved_https_and_robots','bytes':len(html.encode())})
                 items,text=structured_menu(html)
@@ -140,14 +149,40 @@ async def run_one(job_id=None):
             if isinstance(exc,httpx.HTTPStatusError):error=f'Provider returned HTTP {exc.response.status_code}'
             elif isinstance(exc,ValueError):error=str(exc)[:200]
             else:error=f'{type(exc).__name__}: source operation failed'
-            job.error=error;job.state='queued' if job.attempts<3 and source and source.enabled else 'failed'
-            delay=retry_delay_hours(exc,job.attempts)
+            review=requires_review(exc)
+            job.error=error;job.state='queued' if not review and job.attempts<3 and source and source.enabled else 'failed'
+            delay=max(24,source.refresh_hours) if review and source else retry_delay_hours(exc,job.attempts)
+            if review:trace.append({'agent':'Nigehbaan','tool':'source_review_required','reason':error,'automatic_retry':False})
             job.available_at=future(delay);job.trace=json.dumps(trace)
             if source and source.kind=='indiarestros_api' and isinstance(exc,httpx.HTTPStatusError) and exc.response.status_code==429:
                 db.execute(update(CatalogJob).where(CatalogJob.source_id.in_(select(CatalogSource.id).where(CatalogSource.kind=='indiarestros_api')),CatalogJob.state=='queued',CatalogJob.available_at<job.available_at).values(available_at=job.available_at))
             if job.state=='failed':job.finished_at=now()
             db.commit()
-            return {'job_id':job.id,'state':job.state,'error':error}
+            return {'job_id':job.id,'state':job.state,'error':error,'review_required':review}
+
+
+async def run_batch(max_jobs=40,max_seconds=480):
+    """A scheduler can run collection without waking the consumer web service.
+
+    Only existing reviewed sources are scheduled. The deadline stops new work;
+    an in-flight bounded provider request is allowed to finish. No source is
+    approved, enabled, or added implicitly by this command.
+    """
+    if not 1<=max_jobs<=200 or not 1<=max_seconds<=900:
+        raise ValueError('Batch limits must be 1–200 jobs and 1–900 seconds')
+    with Session() as db:queued=schedule(db)
+    deadline=time.monotonic()+max_seconds
+    result={'scheduled':queued,'succeeded':0,'retry_queued':0,'review_required':0,'failed':0,'processed':0}
+    while result['processed']<max_jobs and time.monotonic()<deadline:
+        job=await run_one()
+        if job is None:break
+        key='review_required' if job.get('review_required') else 'retry_queued' if job['state']=='queued' else job['state']
+        result[key]+=1;result['processed']+=1
+        # Below the reviewed public API's 120 requests/minute allowance, even
+        # alongside the serial web-service worker. Provider Retry-After remains authoritative.
+        if job.get('source_kind')=='indiarestros_api' and job['state']=='succeeded':await asyncio.sleep(1)
+    result['deadline_reached']=time.monotonic()>=deadline
+    return result
 
 def main():
     parser=argparse.ArgumentParser()
@@ -156,6 +191,9 @@ def main():
     parser.add_argument('--schedule',action='store_true')
     parser.add_argument('--once',action='store_true')
     parser.add_argument('--loop',action='store_true')
+    parser.add_argument('--batch',action='store_true',help='Process existing reviewed sources for an external scheduler')
+    parser.add_argument('--max-jobs',type=int,default=40)
+    parser.add_argument('--max-seconds',type=int,default=480)
     args=parser.parse_args()
     import os
     if os.getenv('AUTO_CREATE_SCHEMA','false' if os.getenv('APP_ENV')=='production' else 'true').lower()=='true':
@@ -179,4 +217,7 @@ def main():
     if args.once:
         result=asyncio.run(run_one());print(json.dumps(result))
         if result and result['state']!='succeeded':raise SystemExit(1)
+    if args.batch:
+        result=asyncio.run(run_batch(args.max_jobs,args.max_seconds));print(json.dumps(result),flush=True)
+        if result['failed'] or result['review_required'] or result['retry_queued']:raise SystemExit(1)
 if __name__=='__main__':main()

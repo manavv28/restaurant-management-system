@@ -22,8 +22,9 @@ test('Agent Wall shows actual run summaries and protects administration',async({
 test('dark theme can be changed and retained with mobile controls accessible',async({page})=>{
  await page.setViewportSize({width:390,height:844});await page.goto('/');
  await expect(page.locator('html')).toHaveAttribute('data-theme','night');
+ await page.getByLabel('More navigation').click();
  await page.getByRole('button',{name:'Switch to light theme'}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','light');
- await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','light');
+ await page.reload();await expect(page.locator('html')).toHaveAttribute('data-theme','light');await page.getByLabel('More navigation').click();
  await page.getByRole('button',{name:'Switch to dark theme'}).click();await expect(page.locator('html')).toHaveAttribute('data-theme','night');
  await expect(page.getByRole('button',{name:'Enable interface sounds'})).toHaveAttribute('aria-pressed','false');
  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();

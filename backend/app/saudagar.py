@@ -1,5 +1,6 @@
 """Monthly tiers and deduplicated query eligibility; financial facts stay gateway-verified."""
 from datetime import datetime,timedelta,timezone
+import json
 from sqlalchemy import select,func,or_,and_
 from .database import Search,Transaction,Redemption,Campaign,CampaignPolicy,DealVoucher,now
 TIERS=['Bronze','Silver','Gold','Platinum']
@@ -9,6 +10,10 @@ def meaningful_queries(db,user_id,cuisine=''):
     rows=db.scalars(select(Search).where(Search.user_id==user_id,Search.created_at>=cutoff,Search.query!='').order_by(Search.created_at,Search.id)).all()
     last={};count=0;total=0
     for row in rows:
+        try:
+            trace=json.loads(row.trace or '[]')
+            if isinstance(trace,list) and any(isinstance(step,dict) and step.get('tool')=='request_clarification' for step in trace):continue
+        except (ValueError,TypeError):continue
         key=(row.dish or row.cuisine or '').casefold().strip()
         if not key:continue
         known={'hakka noodles','noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vada pav'}

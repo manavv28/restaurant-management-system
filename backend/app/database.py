@@ -83,7 +83,7 @@ class MenuItem(Base):
     available: Mapped[bool] = mapped_column(Boolean, default=True)
     source: Mapped[str] = mapped_column(Text, default='Owner supplied; unverified')
     verified_at: Mapped[str | None] = mapped_column(String(40), nullable=True)
-    dietary: Mapped[str | None] = mapped_column(String(20),nullable=True)
+    dietary: Mapped[str | None] = mapped_column(String(80),nullable=True)
 class Search(Base):
     __tablename__ = 'searches'
     id: Mapped[int] = mapped_column(primary_key=True)

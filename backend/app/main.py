@@ -171,13 +171,13 @@ async def search(body:SearchInput,request:Request,user=Depends(optional_user),db
     try:
         intent, parser = await understand(body.query,body.budget,body.radius_km)
         from .saarthi import continued_intent
-        intent=continued_intent(body.query,intent,body.context)
+        intent=continued_intent(body.query,intent,body.context,body.budget_scope)
     except ValueError:
         raise HTTPException(422,'Budget must be ₹1–100,000 and radius must be greater than zero and at most 50 km')
     data=await run_in_threadpool(search_database,body,intent,parser,user,db)
     await run_in_threadpool(db.commit)
     external=[]
-    if not data.get('results') and (intent.location or body.area) in AREAS and os.getenv('GOOGLE_PLACES_API_KEY') and os.getenv('DISCOVERY_ON_MISS','false').lower()=='true':
+    if not data.get('results') and not data.get('clarification') and (intent.location or body.area) in AREAS and os.getenv('GOOGLE_PLACES_API_KEY') and os.getenv('DISCOVERY_ON_MISS','false').lower()=='true':
         try:
             places=await discover_places(intent.location or body.area)
             from .agents import distance_km
@@ -197,8 +197,23 @@ def search_database(body,intent,parser,user,db,progress=None):
     started=time.monotonic()
     emit=progress or (lambda name,data:None)
     area = intent.location or body.area
-    if area not in AREAS:
-        return {'results':[],'follow_up':'Choose an area in Mumbai or share your location.','trace':[]}
+    if intent.unresolved_location or area not in AREAS:
+        requested=intent.unresolved_location or area
+        question=f'We could not resolve “{requested}” to a supported Mumbai search area. Choose a listed Mumbai area or share a location inside our coverage.'
+        trace=[{'agent':'Query understanding','tool':parser,'output':intent.model_dump()},
+               {'agent':'Location','tool':'request_clarification','output':{'requested':requested,'selected_area':body.area,'substituted':False}}]
+        record=Search(user_id=user.id if user else None,query=body.query,cuisine=intent.cuisine,dish=intent.dish,budget=intent.max_budget,area=requested,results=0,trace=json.dumps(trace))
+        db.add(record);db.flush()
+        db.add(AgentRun(id=uuid.uuid4().hex,agent='Saarthi',status='needs_clarification',search_id=record.id,summary=json.dumps({'parser':parser,'tools':['parse_intent','location_clarification'],'matches':0}),latency_ms=int((time.monotonic()-started)*1000)))
+        db.commit()
+        return {'intent':intent,'results':[],'trace':trace,'parser':parser,'follow_up':question,'external_discovery':[],
+                'nearby_unpriced':[],'alternatives':[],'attribution':'',
+                'search_origin':{'kind':'unresolved','label':'Confirm search location','distance_type':'straight-line'},
+                'clarification':{'field':'location','requested':requested,'question':question},
+                'research':{'state':'idle','message':'Choose a supported location before research starts.'},
+                'verdict':{'requires_clarification':True,'headline':'Confirm your search location','match_count':0,'top_ids':[],
+                           'explanation':question,'budget_notice':None,'distance_notice':None,'party_notice':None,
+                           'mode_notice':'No restaurants were searched in a substituted location.','follow_ups':[],'alternatives':[]}}
     if (body.latitude is None) != (body.longitude is None): raise HTTPException(422,'Supply both latitude and longitude')
     lat,lng = (body.latitude,body.longitude) if body.latitude is not None and not intent.location else AREAS[area]
     trace = [{'agent':'Query understanding','tool':parser,'output':intent.model_dump()},
@@ -251,9 +266,11 @@ def search_database(body,intent,parser,user,db,progress=None):
     alternatives=[]
     if not unique and (intent.dish or intent.cuisine):
         above=menu_search(db,intent.model_copy(update={'max_budget':100000,'sort':'price'}),lat,lng,body.include_samples)[:3]
+        alternative_evidence={row.menu_item_id:row for row in db.scalars(select(MenuEvidence).where(MenuEvidence.menu_item_id.in_([item.id for _,item,_ in above])))} if above else {}
+        alternative_sources=source_metadata(db,alternative_evidence)
         for venue,menu,distance in above:
             if menu.price_paise*(intent.party_size if intent.budget_scope=='total' else 1)<=intent.max_budget*100:continue
-            details=menu_details(db,menu,restaurant_row=venue)
+            details=menu_details(db,menu,restaurant_row=venue,evidence_by_id=alternative_evidence,source_metadata_by_id=alternative_sources)
             alternatives.append({'restaurant_id':venue.id,'restaurant_name':venue.name,'dish_name':menu.name,'price_paise':menu.price_paise,'listed_subtotal_paise':menu.price_paise*(intent.party_size if intent.budget_scope=='total' else 1),'distance_km':round(distance,2),'price_status':details.get('price_status','Unverified'),'source':menu.source})
     data['alternatives']=alternatives
     data['search_origin']={'kind':'gps' if body.latitude is not None and not intent.location else 'area_centre',

@@ -4,6 +4,8 @@ Current hosting target: **Render Free + Supabase PostgreSQL**. See [current setu
 
 A working development MVP with Next.js/TypeScript/Tailwind, Python/FastAPI, relational persistence, structured food search, owner portal and auditable personalised rewards.
 
+Audit follow-up fixes, migration order, scheduler setup and the remaining provider gates are documented in [audit fixes](docs/AUDIT_FIXES.md).
+
 **Data honesty:** production contains 10,404 real-source venues and 357,694 source-listed prices across 2,613 restaurants, with zero fictional samples. Local development seeds clearly labelled samples. Production coverage is incomplete; dated reference prices and owner-supplied facts are not independently verified. Live ordering/payment and authenticated delivery-provider reads are not certified. No external API success is simulated.
 
 The uploaded PRD implementation includes the [map concierge](https://restaurant-management-system-qxtx.vercel.app/concierge), [Agent Wall](https://restaurant-management-system-qxtx.vercel.app/agents), reviewed-source research, contextual verdicts, reward tiers, claim/QA workflows and sandbox voucher logic. See [current release evidence](docs/STATUS.md), [PRD traceability](docs/PRD_TRACEABILITY.md) and [remaining requirements](docs/COMPLETION_CHECKLIST.md). The [2-minute public-app walkthrough](docs/demo/biteai-prd-demo.mp4) shows the current map/text flow with explicit verification limits.

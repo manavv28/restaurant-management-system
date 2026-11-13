@@ -1,29 +1,96 @@
-# November 2026 audit fixes
+# Audit fixes and deployment gates
 
-This release builds on production commit 64502c7. It does not replace the real catalog with samples or reset data.
+This change starts from the audited `deploy/biteai-mvp` release `518ad6c`.
+It prepares source fixes; it does not claim the public deployment or its data has
+already changed. The owner confirmed that no AI, delivery-platform or payment
+provider account is currently approved/configured for this work.
 
 ## Implemented
 
-- Exact dish phrases exclude related snacks (for example pizza puff, pizza pocket and pizza sandwich). Filtering happens before each venue's cheapest eligible item is chosen.
-- Known dish/cuisine pairs use dish evidence rather than incomplete venue cuisine tags. Broad discovery excludes common bottled-water brands and standalone accompaniments.
-- Search responses identify GPS versus an area centre. The UI displays that origin, synchronizes budget/radius/location controls and provides an editable constraint form.
-- Mobile search is reachable in the first screen; card artwork is compact and provenance/availability details expand on request. Final-total uncertainty remains visible.
-- Phone/tablet overflow and small primary tap targets are addressed; search and editor inputs use 16px text on phones.
-- Coverage includes source-priced menu counts by assigned locality and number-format mobile/landline/unclassified counts. These are catalog coverage measures, never a census or proof a number is active.
-- Collection scheduling prioritizes menu gaps and recent locality demand without bypassing provider cooldowns. A failed candidate menu link no longer prevents checking subsequent approved links.
-- Agent Wall exposes stale/failed collection alerts and records the actual parser used, rather than treating a configured but failed model as a successful model execution.
+- Parse `300 rupaye mein`, Devanagari digits and spoken price amounts without
+  treating a party size or distance as a rupee limit.
+- Validate model proposals, then preserve explicit budgets, distance, location,
+  dietary requirements, exclusions, party size and budget scope. A model cannot
+  replace an unsupported location with Bandra.
+- Return a complete clarification response for unresolved places. Both JSON and
+  streamed search paths retain the requested place, skip catalogue/research
+  substitution, and persist the clarification without issuing query reward credit.
+- Match all explicit dietary declarations together, including vegan/gluten-free.
+  Unknown declarations do not satisfy a request. Owners can declare these labels;
+  labels remain owner/source declarations, not independently verified ingredients.
+- Add per-item/total budget controls and preserve edits made while an older search
+  is pending. Group subtotals still identify unconfirmed fees and portions.
+- Preselect the owner role from restaurant registration and preserve that intent
+  across the sign-in/signup switch.
+- Add compact phone navigation, 44px map microphone targets, scrollable filter
+  panels with a Done action, and more readable expandable menu provenance.
+- Put the searched dish first in the restaurant menu; choose fallback food art
+  from the dish rather than an incomplete restaurant cuisine label.
+- Keep original price observation age separate from retrieval and preserve source
+  metadata for above-budget alternatives. Old reference prices remain labelled.
+- Stop automatic retry storms for invalid evidence, identity conflicts and denied
+  source access. Transient failures retain backoff; review failures retain a
+  minimum 24-hour cooldown. Expired worker leases are recovered atomically.
+- Expose low-coverage collection priorities and add bounded collection batches
+  that can run independently of the sleeping web service.
 
-## Verified existing flows
+## Migration and rollout order
 
-Isolated browser journeys cover restaurant onboarding, menu editing, campaign creation, account sessions, consent, supported voice adapters/fallbacks and GPS allow/deny. Backend tests cover discount caps, meaningful-query deduplication, payment signature validation, replay protection, refund/dispute adjustments, test-money separation and ownership boundaries. Browser payment tests use explicit fixtures, not real charges or a live gateway.
+1. Back up the existing production database using the configured operator process.
+2. Apply `supabase/migrations/20261113173000_declared_dietary_labels.sql` through
+   the existing migration runner. It widens the declaration column and expands
+   its check constraint without rewriting existing declarations or granting access.
+3. Deploy the backend from this change. Existing clients remain compatible.
+4. Deploy the frontend with the existing `API_INTERNAL_URL`. Preserve database,
+   authentication, mail and provider settings. Do not enable payment simulation
+   or fictional seeds in production.
+5. Verify the live release, Hindi budget query, unsupported-location clarification,
+   owner signup and mobile controls. The tests in this change run on isolated data.
 
-## External completion gates
+The new frontend sends an optional `budget_scope` field. Deploy the backend first
+so the control has its intended effect. Roll back the application without narrowing
+the dietary column: existing old declarations remain valid under this migration.
 
-- All Mumbai restaurants/menus/mobile numbers: a complete census is not established. The existing licensed-source collection and import tools remain available; missing menus require permitted source observations and identity review. Invalid source/branch evidence must not be accepted merely to raise coverage.
-- Always-on collection: a sleeping free web service cannot guarantee it. This patch does not buy infrastructure or change billing plans.
-- Live Zomato/Swiggy comparison: existing official adapters require provider-approved access and configuration. Public search links are not price verification. No credentials or provider approvals are invented.
-- AI model execution: configure a supported model through server secret settings. Deterministic fallback remains usable and is labelled accurately.
-- GPay/UPI history: UPI IDs/payment intents do not grant history access. Existing consent covers BiteAI payment records only; Razorpay integration remains test-only until a separately reviewed live payment release and merchant onboarding.
-- Physical devices: Chromium viewport, mocked voice recognition and geolocation tests do not verify iOS Safari/Android speech services, actual microphone capture or payment-app handoff.
+## Collection outside Render Free uptime
 
-No schema migrations or production data edits are required by this patch.
+The existing web-service worker remains compatible. An external scheduler can run:
+
+```sh
+PYTHONPATH=backend python -m app.catalog_worker --batch --max-jobs 100 --max-seconds 600
+```
+
+This schedules **existing enabled, reviewed sources only**. It does not add new
+sources, change permissions, bypass robots/access restrictions, scrape restricted
+platforms or synthesize missing menus. Atomic job claims prevent duplicate work
+with the web-service worker. Backoff and source-review cooldown remain authoritative.
+The time budget stops starting new work; an in-flight bounded source request can
+finish. A nonzero exit means a failure, retry or review is pending.
+
+`.github/workflows/catalog-refresh.yml` supplies an hourly bounded scheduler using
+the deployment branch. To activate it, put the workflow on the repository's default
+branch, configure the `production-catalog` environment, and supply the server-only
+`CATALOG_DATABASE_URL` secret through secure configuration. The collection runner
+does not need the web application's JWT secret or provider account tokens. Do not
+rotate working values or paste them into chat. Set approved host variables from the operator's
+reviewed list. An optional `GEMINI_API_KEY` enables extraction only when supplied.
+The workflow fails clearly before collection if required settings are absent.
+
+No scheduled production run or new catalogue coverage is claimed by committing
+this workflow. Expanding coverage still requires reviewed sources, provider access
+and successful collection into the live database. `is_complete: false` remains
+explicit; a complete Mumbai denominator has not been established.
+
+## Still external or unverified
+
+| Capability | Remaining prerequisite |
+|---|---|
+| Live AI reasoning/extraction | Configure Gemini credentials or a reachable operator-hosted model; run credentialed verification. The deterministic fallback remains accurately labelled. |
+| Zomato/Swiggy reads | Provider approval and schema/price-unit verification; authenticate through the provider. Do not bypass the existing whitelist/OTP blocks. |
+| Payment-backed discounts | Onboard a merchant, configure sandbox keys/webhook and restaurant mapping, then exercise actual authorized sandbox capture/refund/redemption. Fixtures do not establish provider certification. |
+| Wider payment history | A supported consent-based data provider is required. A UPI ID supplies no account history; no GPay credentials or UPI PINs are collected. |
+| Complete Mumbai data | Expand and verify permitted sources and branch identities; measure completeness against a dated baseline. Missing facts remain missing. |
+| Scheduled production collection | Activate a scheduler with securely configured database/worker access; verify real run results and source health. |
+| Physical mobile behavior | Test real Android/iOS audio, GPS, keyboard, install and payment-return flows. Automated viewport/adapter tests do not certify physical devices. |
+
+See `docs/REQUIRED_CONFIGURATION.md`, `docs/PROVIDER_ACTIVATION.md` and
+`docs/PAYMENTS.md` for the existing provider activation contracts.

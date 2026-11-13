@@ -69,11 +69,11 @@ def test_worker_success_retry_and_job_trace(client,monkeypatch):
         db.add(CatalogJob(source_id=sid));db.commit()
     async def failed_fetch(s):raise ValueError('Source robots.txt disallows collection')
     monkeypatch.setattr(worker,'fetch_menu',failed_fetch)
-    result=asyncio.run(run_one());assert result['state']=='queued'
+    result=asyncio.run(run_one());assert result['state']=='failed' and result['review_required']
     with Session() as db:
         job=db.get(CatalogJob,result['job_id']);assert job.attempts==1 and 'robots' in job.error
-        job.available_at='2000';job.attempts=2;db.commit()
-    assert asyncio.run(run_one())['state']=='failed'
+        assert any(step['tool']=='source_review_required' for step in json.loads(job.trace))
+    assert asyncio.run(run_one()) is None
 
 def test_source_approval_and_owner_isolation(client,monkeypatch):
     monkeypatch.setenv('APPROVED_MENU_HOSTS','menu.example.test')

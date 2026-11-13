@@ -60,3 +60,30 @@
 }
 
 [data-theme="night"] .result-count { background:#293e2d; color:#e5ece2; }
+
+/* Audit follow-up: source readability and phone navigation. */
+.experience-controls>button>span,.mobile-more,.mobile-filter-done { display:none; }
+.mobile-more { position:relative; }
+.mobile-more summary { list-style:none; display:flex; align-items:center; justify-content:center; min-width:44px; min-height:44px; cursor:pointer; border-radius:10px; }
+.mobile-more summary::-webkit-details-marker { display:none; }
+.more-pages { position:absolute; top:calc(100% + 8px); right:0; z-index:900; width:220px; padding:8px; border:1px solid var(--line); border-radius:14px; background:var(--cream); box-shadow:0 12px 30px #0003; }
+.more-pages a,.experience-controls .more-pages button { display:flex; align-items:center; justify-content:flex-start; gap:10px; width:100%; min-height:44px; padding:10px 12px; font-size:13px; border-radius:8px; }
+.more-pages a:hover { background:var(--line); }
+.freshness-note { display:block; width:100%; }
+.menu-provenance { margin-top:8px; font-size:12px; line-height:1.6; }
+.menu-provenance summary { min-height:44px; display:flex; align-items:center; cursor:pointer; text-decoration:underline; text-underline-offset:3px; }
+.menu-row>div { min-width:0; }
+.menu-row small { font-size:12px; line-height:1.65; overflow-wrap:anywhere; }
+.matched-menu-row { border:1px solid var(--orange); border-radius:12px; padding:16px; margin-top:12px; }
+.matched-menu-label { display:block; color:var(--orange); font-size:12px; font-weight:650; margin-bottom:6px; }
+@media(max-width:1000px) { .mobile-more { display:block; } }
+@media(max-width:760px) {
+ .experience-controls>.experience-theme,.experience-controls>.experience-sound { display:none; }
+ .immersive-discovery .search-box .mic { width:44px; min-width:44px; min-height:44px; }
+ .immersive-discovery .search-filters.filters-open { position:absolute; top:calc(100% + 6px); left:0; right:0; max-height:min(48dvh,340px); overflow-y:auto; overscroll-behavior:contain; border:1px solid var(--line); border-radius:16px; background:var(--cream); padding:14px; gap:10px; box-shadow:0 12px 30px #0003; }
+ .immersive-discovery .filters-open+.location-context { display:none; }
+ .immersive-discovery .mobile-filter-done { display:flex; width:100%; min-height:44px; justify-content:center; }
+ .menu-row { gap:10px; }
+ .menu-row b { font-size:14px; }
+ .menu-row>button { flex-shrink:0; min-height:44px; min-width:44px; }
+}

@@ -8,11 +8,13 @@ From backend, with the same DATABASE_URL as the API:
 
 For hosted installations use python -m app.catalog_worker with the same arguments.
 --seed-osm registers five OpenStreetMap Overpass discovery sources: 3 km around Bandra, Andheri, Powai, Colaba and Dadar. These circles are a partial dataset, not a Mumbai-wide census. It registers jobs, not fictional restaurant records.
---schedule queues due enabled sources and prevents duplicate active jobs. Failed sources receive a six-hour cooldown after three attempts.
+--schedule queues due enabled sources and prevents duplicate active jobs. Transient failures retry at most three times with backoff. Invalid evidence, identity conflicts and access denials stop for source review with at least 24 hours cooldown; provider backoff remains authoritative.
 --once claims and runs one available job. Repeat to drain batches (five initial jobs need five invocations). Exit code 1 means failure/retry, not readiness.
 Run the command with --schedule --once every minute from a platform scheduler or worker. The production supervisor starts the polling worker when CATALOG_WORKER_ENABLED=true; the updated Render blueprint enables it. Existing deployments need that environment variable and a new deployment. It polls every 30 seconds. Free-service sleeping suspends collection too; use a separate persistent worker for reliable schedules. Do not schedule --seed-osm repeatedly as a substitute for collecting jobs. No paid worker is provisioned.
 
 Jobs persist attempts, a ten-minute crash lease, exponential retry delays, terminal failures and structured tool traces. Sources refresh based on last successful check. An HTTP failure does not create restaurant rows.
+
+For collection independent of web-service uptime, use the bounded `--batch` command and scheduler configuration in [audit fixes](AUDIT_FIXES.md). The scheduler needs its own securely configured access and default-branch workflow activation; committing the workflow alone does not activate it.
 
 ## OpenStreetMap discovery
 Only the configured Overpass endpoint is queried. Named restaurant nodes/ways/relations inside the Mumbai bounding box are deduplicated by stable OSM type/ID. Stored fields include community-supplied coordinates, address, cuisine, published phone and website when present. Missing values stay missing. Ratings and menus are never inferred.
