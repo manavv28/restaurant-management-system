@@ -23,11 +23,13 @@ def test_devanagari_and_conversation_context():
 def test_verdict_stream_preserves_real_constraints_and_logs_actual_run(client):
     response=client.post('/query/stream',json={'query':'Chinese Hakka noodles 300 mein 2 km ke andar Bandra mein','research':False})
     assert response.status_code==200
+    assert response.headers['content-encoding']=='identity' and 'no-transform' in response.headers['cache-control']
     frames=[frame for frame in response.text.split('\n\n') if frame.startswith('event:')]
     events=[frame.split('\n')[0][7:] for frame in frames]
     assert events==['status','intent','candidates_found','menu_checked','price_filtered','verified','offers_applied','verdict']
     data=json.loads(frames[-1].split('data: ',1)[1]);assert data['verdict']['match_count']==1
     assert data['intent']['dish']=='hakka noodles'
+    assert data['nearby_unpriced']==[]
     assert data['results'][0]['dish']['price_paise']==24000
     assert not data['results'][0]['confidence']['independently_verified']
     assert data['results'][0]['platform_links']['presence'].startswith('Not checked')
@@ -70,7 +72,9 @@ def test_missing_menu_research_persists_evidence_and_updates_the_lake(client,mon
     with Session() as db:
         restaurant=Restaurant(name='Synthetic research fixture',address='Synthetic Bandra fixture',area='Bandra',latitude=19.0596,longitude=72.8295,cuisine='Chinese',sample=False)
         db.add(restaurant);db.flush();rid=restaurant.id
-        db.add(CatalogSource(kind='approved_menu',url='https://menus.example.test/food',restaurant_id=rid,area='Bandra',permission_note='Synthetic approved publisher fixture',enabled=True));db.commit()
+        db.add(CatalogSource(kind='approved_menu',url='https://menus.example.test/food',restaurant_id=rid,area='Bandra',permission_note='Synthetic approved publisher fixture',enabled=True))
+        for n in range(12):db.add(Restaurant(name='Unsourced fixture '+str(n),address='Synthetic Bandra fixture',area='Bandra',latitude=19.0596,longitude=72.8295,cuisine='Chinese',sample=False))
+        db.commit()
     first=client.post('/query/stream',json={'query':'Hakka noodles under 300 in Bandra','include_samples':False})
     frame=next(f for f in first.text.split('\n\n') if f.startswith('event: verdict'));data=json.loads(frame.split('data: ',1)[1])
     assert data['results']==[] and data['research']['state']=='queued'
@@ -131,3 +135,22 @@ def test_unrecognised_zero_result_queries_do_not_earn_reward_credit(client):
     for q in ['find asdfgh qwerty','find nonsenseabc xyz','']:
         assert client.post('/search',headers=auth,json={'query':q}).status_code==200
     assert client.get('/me',headers=auth).json()['rewards']['meaningful_queries_30d']==0
+
+
+def test_production_verdict_never_waits_for_citywide_coverage_calculation(client,monkeypatch):
+    import app.main as main
+    monkeypatch.setenv('APP_ENV','production')
+    monkeypatch.setattr(main,'calculate_coverage',lambda db:(_ for _ in ()).throw(AssertionError('Citywide aggregate entered the verdict path')))
+    data=client.post('/search',json={'query':'Hakka noodles under 300','research':False}).json()
+    assert data['results'] and data['catalog'] is None
+
+
+def test_coverage_cache_is_explicitly_timestamped_and_does_not_cache_searches(client,monkeypatch):
+    import app.main as main
+    monkeypatch.setenv('APP_ENV','production');monkeypatch.setattr(main,'_coverage_snapshot',{})
+    calls=[]
+    def summary(db):calls.append(1);return {'real_restaurants':123,'snapshot_at':'synthetic-timestamp','cache_max_age_seconds':60}
+    monkeypatch.setattr(main,'calculate_coverage',summary)
+    assert client.get('/catalog/coverage').json()['real_restaurants']==123
+    assert client.get('/catalog/coverage').json()['snapshot_at']=='synthetic-timestamp'
+    assert len(calls)==1

@@ -72,13 +72,14 @@ export default function Home({immersive=false}:{immersive?:boolean}){
    setUser(me);setOffers(o);setHistory(h);setTransactions(t);setFavourites(f);setRedemptions(r);
    }catch(error){if(version===accountVersion.current)throw error}
  },[]);
+ type QueryData={results:Match[];trace:Trace[];parser:string;follow_up:string;nearby_unpriced?:typeof unpriced;attribution:string;external_discovery:typeof external;intent?:Record<string,unknown>;verdict?:Verdict;research?:Research};
  async function search(e?:FormEvent,override?:string,allowResearch=true){
    e?.preventDefault();const version=++searchVersion.current;searchAbort.current?.abort();const controller=new AbortController();searchAbort.current=controller;setSteps([]);setVerdict(null);setResearch(null);setLoading(true);setError('');setSearchError('');setSearchStatus('Connecting to the search service…');
    try{
     await ensureSearchReady(()=>{if(version===searchVersion.current)setSearchStatus('Starting the search service. This may take up to a minute.')});
     if(version!==searchVersion.current)return;
     setSearchStatus('');
-    const data=await queryRequest<{results:Match[];trace:Trace[];parser:string;follow_up:string;nearby_unpriced?:typeof unpriced;attribution:string;external_discovery:typeof external;intent?:Record<string,unknown>;verdict?:Verdict;research?:Research}>({query:override??query,area,budget,radius_km:radius,include_samples:samples,stream:true,research:allowResearch,context:intentContext.current,...coords},step=>{if(version===searchVersion.current)setSteps(previous=>[...previous,step])},controller.signal);
+    const data=await queryRequest<QueryData>({query:override??query,area,budget,radius_km:radius,include_samples:samples,stream:true,research:allowResearch,context:intentContext.current,...coords},step=>{if(version===searchVersion.current)setSteps(previous=>[...previous,step])},controller.signal);
     if(version!==searchVersion.current)return;
     if(!Array.isArray(data.results)||!Array.isArray(data.trace))throw new Error('The search service returned an incomplete response. Please retry.');
     if(data.intent)intentContext.current=data.intent;setVerdict(data.verdict||null);setResearch(data.research||null);
@@ -90,7 +91,29 @@ export default function Home({immersive=false}:{immersive?:boolean}){
  useEffect(()=>{search();sessionStorage.removeItem('biteai-token');ensureSearchReady(()=>{}).then(()=>{refreshAccount().catch(()=>setUser(null));request<typeof stats>('/analytics').then(setStats).catch(()=>{});request<Record<string,[number,number]>>('/areas').then(values=>setAreas(Object.keys(values))).catch(()=>{})}).catch(()=>{});},[]); // Initial discovery uses the selected default area.
  useEffect(()=>{if(tab==='dashboard'&&user)refreshAccount().catch(e=>setError(e.message));if(tab==='portal'&&user?.role==='owner')request<Restaurant[]>('/portal/restaurants').then(setOwned).catch(e=>setError(e.message));},[tab,user?.id,refreshAccount,user?.role]);
  useEffect(()=>{if(!selectedOwner)return;Promise.all([request<{menu:Dish[]}>('/restaurants/'+selectedOwner),request<typeof ownerAnalytics>('/portal/restaurants/'+selectedOwner+'/analytics')]).then(([r,a])=>{setOwnerMenu(r.menu);setOwnerAnalytics(a)}).catch(e=>setError(e.message));},[selectedOwner,busy]);
- useEffect(()=>{if(!research?.token)return;let active=true;const version=searchVersion.current;const token=research.token;let rounds=0;const timer=setInterval(()=>{if(!active||document.visibilityState!=='visible')return;void request<{state:string;succeeded:number;message:string}>('/research/'+encodeURIComponent(token)).then(value=>{if(!active||version!==searchVersion.current)return;setResearch(previous=>previous?{...previous,message:value.message}:null);if(value.state==='completed'){clearInterval(timer);if(value.succeeded>0)void search(undefined,query,false)}else if(++rounds>=24){clearInterval(timer);setResearch(previous=>previous?{...previous,message:'Research is taking longer. Cached results remain available; check the Agent Wall for job progress.'}:null)}}).catch(()=>{clearInterval(timer)})},5000);return()=>{active=false;clearInterval(timer)}},[research?.token]);
+ useEffect(()=>{
+  if(!research?.token)return;
+  let active=true,rounds=0,seen=0,polling=false;const version=searchVersion.current,token=research.token,controller=new AbortController();
+  const timer=setInterval(()=>{
+   if(!active||polling||document.visibilityState!=='visible')return;
+   polling=true;
+   void (async()=>{
+    const value=await request<{state:string;succeeded:number;message:string}>('/research/'+encodeURIComponent(token),{signal:controller.signal});
+    if(!active||version!==searchVersion.current)return;
+    setResearch(previous=>previous?{...previous,message:value.message}:null);
+    if(value.succeeded>seen){
+     seen=value.succeeded;
+     const data=await request<QueryData>('/search',{...post({query,area,budget,radius_km:radius,include_samples:samples,research:false,context:intentContext.current,...coords}),signal:controller.signal});
+     if(!active||version!==searchVersion.current)return;
+     setResults(data.results);setUnpriced(data.nearby_unpriced||[]);setAttribution(data.attribution||'');setVerdict(data.verdict||null);setTrace(data.trace);setParser(data.parser);setFollowUp(data.follow_up||'');
+     window.dispatchEvent(new Event('biteai:catalog-updated'));
+    }
+    if(value.state==='completed')clearInterval(timer);
+    else if(++rounds>=24){clearInterval(timer);setResearch(previous=>previous?{...previous,message:'Some source checks are still running. The latest available verdict is shown; see the Agent Wall for progress.'}:null)}
+   })().catch(()=>{if(!controller.signal.aborted)setResearch(previous=>previous?{...previous,message:'Research status could not be refreshed. Your latest verdict remains available.'}:null);clearInterval(timer)}).finally(()=>{polling=false});
+  },5000);
+  return()=>{active=false;controller.abort();clearInterval(timer)};
+ },[research?.token]);
  useEffect(()=>{if(!user||tab!=='discover')return;let active=true;const refresh=()=>{if(document.visibilityState!=='visible')return;void request<Offer[]>('/me/offers').then(rows=>{if(!active)return;setResults(previous=>previous.map(row=>({...row,offers:rows.filter(offer=>offer.restaurant_id===row.restaurant.id&&offer.eligible).map(offer=>{const discount=Math.min(offer.policy_limits?.flat_discount_paise||Math.floor(row.dish.price_paise*offer.percent/100),offer.max_discount_paise,row.dish.price_paise);const applies=row.dish.price_paise>=offer.min_order_paise&&(!offer.policy_limits||discount<=offer.policy_limits.remaining_paise);return {...offer,applies_to_item:applies,discount_paise:applies?discount:0,final_price_paise:row.dish.price_paise-(applies?discount:0),notice:'Offer preview; checkout and restaurant confirmation required.'}})})))}).catch(()=>{})};const timer=setInterval(refresh,15000);window.addEventListener('focus',refresh);return()=>{active=false;clearInterval(timer);window.removeEventListener('focus',refresh)}},[user?.id,tab]);
  useEffect(()=>()=>{searchAbort.current?.abort()},[]);
  useEffect(()=>{if(!immersive&&verdict&&query.trim())document.querySelector('[aria-label="Your food verdict"]')?.scrollIntoView({behavior:window.matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'start'})},[verdict]);

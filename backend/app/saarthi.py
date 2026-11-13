@@ -77,18 +77,18 @@ def verdict(data,intent):
 def request_research(db,search_record,data,body,intent):
     """Demand schedules existing reviewed sources only; no arbitrary URLs or private platform export."""
     ids=[r['restaurant']['id'] for r in data.get('nearby_unpriced',[])][:10]
-    if len(ids)<10:
-        from .database import Restaurant
-        from .geo import candidates
-        from .agents import AREAS,distance_km
-        lat,lng=(body.latitude,body.longitude) if body.latitude is not None else AREAS[intent.location or body.area]
-        query=select(Restaurant.id,Restaurant.latitude,Restaurant.longitude).join(CatalogSource,CatalogSource.restaurant_id==Restaurant.id).where(CatalogSource.enabled.is_(True),CatalogSource.kind.in_(['approved_menu','indiarestros_api']),Restaurant.sample.is_(False),Restaurant.owner_id.is_(None))
-        nearby=db.execute(candidates(db,query,lat,lng,intent.radius_km).limit(80)).all()
-        ids+= [row.id for row in sorted(nearby,key=lambda row:distance_km(lat,lng,row.latitude,row.longitude)) if distance_km(lat,lng,row.latitude,row.longitude)<=intent.radius_km and row.id not in ids][:10-len(ids)]
+    from .database import Restaurant
+    from .geo import candidates
+    from .agents import AREAS,distance_km
+    lat,lng=(body.latitude,body.longitude) if body.latitude is not None else AREAS[intent.location or body.area]
+    query=select(Restaurant.id,Restaurant.latitude,Restaurant.longitude).join(CatalogSource,CatalogSource.restaurant_id==Restaurant.id).where(CatalogSource.enabled.is_(True),CatalogSource.kind.in_(['approved_menu','indiarestros_api']),Restaurant.sample.is_(False),Restaurant.owner_id.is_(None))
+    nearby=db.execute(candidates(db,query,lat,lng,intent.radius_km).limit(80)).all()
+    ids+= [row.id for row in sorted(nearby,key=lambda row:distance_km(lat,lng,row.latitude,row.longitude)) if distance_km(lat,lng,row.latitude,row.longitude)<=intent.radius_km and row.id not in ids][:10]
     if not ids:return {'state':'unavailable','message':'No approved nearby source can fill this gap. Cached results remain available.'}
-    sources=db.scalars(select(CatalogSource).where(CatalogSource.restaurant_id.in_(ids),CatalogSource.enabled.is_(True),CatalogSource.kind.in_(['approved_menu','indiarestros_api'])).limit(3)).all()
+    sources=db.scalars(select(CatalogSource).where(CatalogSource.restaurant_id.in_(ids),CatalogSource.enabled.is_(True),CatalogSource.kind.in_(['approved_menu','indiarestros_api'])).limit(20)).all()
     jobs=[];cutoff=(datetime.now(timezone.utc)-timedelta(minutes=30)).isoformat()
     for source in sources:
+        if len(jobs)>=3:break
         latest=db.scalar(select(CatalogJob).where(CatalogJob.source_id==source.id).order_by(CatalogJob.id.desc()).limit(1))
         if latest and latest.state in ('running','queued'):jobs.append(latest.id);continue
         if latest and latest.finished_at and latest.finished_at>cutoff:continue
@@ -156,7 +156,7 @@ async def stream_search(body,user_id):
                         db.execute(update(CatalogJob).where(CatalogJob.id==job_id,CatalogJob.state=='running').values(state='queued',error='Research budget exceeded; durable worker will retry',available_at=now()));db.commit()
                     break
     from starlette.background import BackgroundTask
-    return StreamingResponse(events(),background=BackgroundTask(finish_research),media_type='text/event-stream',headers={'Cache-Control':'no-store','X-Accel-Buffering':'no'})
+    return StreamingResponse(events(),background=BackgroundTask(finish_research),media_type='text/event-stream',headers={'Cache-Control':'no-store, no-transform','Content-Encoding':'identity','X-Accel-Buffering':'no'})
 
 @router.get('/research/{token}')
 def research_status(token:str,user=Depends(optional_user),db=Depends(db_session)):
