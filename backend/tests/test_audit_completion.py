@@ -37,6 +37,16 @@ def test_generic_cuisine_does_not_recommend_bottled_water(client):
     assert rows[0]['dish']['name']=='Veg Fried Rice'
 
 
+def test_beverages_require_an_explicit_dish_request(client):
+    from app.agents import parse_local
+    assert parse_local('steamed rice under 300').dish is None
+    assert parse_local('coffee under 100').dish=='coffee'
+    rows=client.post('/search',json={'query':'South Indian under 200 within 10 km'}).json()['results']
+    assert rows and all('coffee' not in row['dish']['name'].casefold() for row in rows)
+    drinks=client.post('/search',json={'query':'coffee under 100 within 10 km'}).json()['results']
+    assert drinks and drinks[0]['dish']['name']=='Filter coffee'
+
+
 def test_search_origin_identifies_gps_and_explicit_area(client):
     gps={'latitude':19.0596,'longitude':72.8295}
     assert client.post('/search',json={'query':'noodles',**gps}).json()['search_origin']['kind']=='gps'

@@ -58,3 +58,5 @@
  .immersive-discovery .location-context { display:none; }
  .immersive-discovery .filters-open+.location-context { display:block; }
 }
+
+[data-theme="night"] .result-count { background:#293e2d; color:#e5ece2; }

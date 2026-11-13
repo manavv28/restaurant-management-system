@@ -41,14 +41,15 @@ def parse_local(query, budget=500, radius=5):
     cuisines = ['Chinese','Indian','Italian','Japanese','Mexican','South Indian']
     cuisine = next((c for c in reversed(cuisines) if c.lower() in q), None)
     dishes = ['hakka noodles','noodles soup','pizza puff','pizza pocket','pizza sandwich','pizza burger','pasta salad','pasta soup',
-              'noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vadapav','vada pav']
+              'noodles','biryani','pizza','dosa','sushi','burger','pasta','tacos','paneer tikka','vadapav','vada pav',
+              'coffee','tea','juice','ice cream','soup','salad']
     def negated(term):
         token=r'(?<!\w)'+re.escape(term)+r'(?!\w)'
         return bool(re.search(r'(?:no|not|without|except|avoid|exclude)\s+(?:any\s+)?'+token,q) or re.search(token+r'\s+(?:nahi|nahin|mat|नहीं)\b',q))
     excluded_dishes=[d for d in dishes if negated(d)]
     excluded_cuisines=[c for c in cuisines if negated(c.lower())]
     if cuisine in excluded_cuisines:cuisine=None
-    dish = next((d for d in dishes if d in q and d not in excluded_dishes and not any(x in d or d in x for x in excluded_dishes)), None)
+    dish = next((d for d in dishes if re.search(r'(?<!\w)'+re.escape(d)+r'(?!\w)',q) and d not in excluded_dishes and not any(x in d or d in x for x in excluded_dishes)), None)
     # A party size or a distance must never become a rupee amount.
     money=None
     for candidate in re.finditer(r'(?:under|below|budget(?: of)?|total|less than|for|₹|rs\.?)[\s₹]*(\d+)',q):
@@ -139,6 +140,8 @@ def menu_search(db, intent, lat, lng, include_samples=True):
         query=query.where(~func.lower(func.trim(MenuItem.name)).in_(['pav','plain pav','butter pav','pav / butter pav','chapati','roti','tandoori roti','slice bread','bread','extra cheese','water','mineral water']))
         for prefix in ('bisleri','aquafina','kinley','mineral water','packaged water','bottled water','extra ','add on ','add-on ','christmas special cookies'):
             query=query.where(~func.lower(MenuItem.name).startswith(prefix,autoescape=True))
+        for beverage in ('coffee','tea','lassi','juice','pepsi','coke','soda'):
+            query=query.where(~padded.contains(' '+beverage+' ',autoescape=True))
     if intent.diet:query=query.where(MenuItem.dietary==intent.diet)
     eligible=candidates(db,query,lat,lng,intent.radius_km).subquery()
     rows=db.execute(select(eligible).where(eligible.c.choice==1)).mappings().all()
