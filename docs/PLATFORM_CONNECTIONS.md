@@ -14,7 +14,7 @@ BiteAI uses official MCP endpoints rather than undocumented consumer APIs. The u
 
 The existing Render Free service remains the backend; Supabase remains the database. Apply `20261112202617_provider_connections.sql` before deploying the compatible backend.
 
-The exact approved callback URLs are:
+The exact callback URLs requiring provider approval are:
 
 - `https://restaurant-management-system-qxtx.vercel.app/api/platforms/swiggy/callback`
 - `https://restaurant-management-system-qxtx.vercel.app/api/platforms/zomato/callback`
@@ -43,3 +43,11 @@ The user's approvals authorize the connection work; they do not establish a bulk
 - [Swiggy delegated OAuth](https://mcp.swiggy.com/builders/docs/start/enterprise/delegated-auth/)
 - [Swiggy data handling](https://mcp.swiggy.com/builders/docs/operate/data-and-compliance/)
 - [Swiggy access and export limits](https://mcp.swiggy.com/builders/docs/operate/access/)
+
+## Provider login failures observed, 13 November 2026 (India)
+
+The user's Swiggy login screenshot explicitly reports: “Oops, Vercel isn't whitelisted yet. This client isn't supported for Swiggy MCP sign-in yet.” Dynamic registration acceptance did not establish authorization for this deployed client. Prior user-reported approval remains recorded, but effective production whitelisting is unverified and Swiggy is blocked. Do not disguise this client as another supported client or substitute another application's redirect URL.
+
+Zomato's provider-hosted OTP screen reports “Invalid request data.” This screenshot does not identify a confirmed root cause. Current OAuth metadata advertises the configured authorization/registration endpoints, `mcp:tools`, S256 and public-client authentication (`none`); no mismatch was found in these advertised parameters. Zomato's public manifest separately requires explicit callback whitelisting and provider discussion for third-party app integration. A failed OTP screen is not evidence of a successful account connection. Do not request OTPs or consumer credentials in chat or trigger additional OTP sends for diagnosis.
+
+Provider support must verify the deployed app's exact callback/client registration and effective access. See [PROVIDER_ACTIVATION.md](PROVIDER_ACTIVATION.md) for a ready-to-copy request. Nothing was submitted to either provider on the user's behalf.
