@@ -11,12 +11,15 @@ test('Hinglish streaming verdict preserves context and exposes honest confidence
  await expect(page.getByRole('link',{name:'Check on Swiggy'}).first()).toHaveAttribute('href',/swiggy\.com\/search\?query=/);
 });
 
-test('Agent Wall shows actual run summaries and protects administration',async({page})=>{
- await page.goto('/');await expect(page.getByRole('region',{name:'Your food verdict'})).toBeVisible();
- await page.goto('/agents');await expect(page.getByRole('heading',{name:'Meet your food crew.'})).toBeVisible();
- await expect(page.getByRole('heading',{name:'Catalogue job queue'})).toBeVisible();await expect(page.getByRole('heading',{name:'Recent query workflow runs'})).toBeVisible();
- await expect(page.getByRole('heading',{name:'Administrator quality review'})).toHaveCount(0);
- const response=await page.request.get('/api/admin/quality');expect(response.status()).toBe(401);
+test('public search explainer keeps operational data behind administrator access',async({page})=>{
+ let operationalReads=0;page.on('request',request=>{if(/\/api\/(?:admin|agents\/activity)/.test(request.url()))operationalReads++});
+ await page.goto('/agents');await expect(page.getByRole('heading',{name:'How your search works',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Catalogue job queue'})).toHaveCount(0);
+ await expect(page.getByRole('heading',{name:'Recent query workflow runs'})).toHaveCount(0);
+ await expect(page.getByRole('link',{name:'Find my food'})).toBeVisible();expect(operationalReads).toBe(0);
+ await page.goto('/admin/agents');await expect(page.getByRole('heading',{name:'Administrator access required'})).toBeVisible();
+ expect(operationalReads).toBe(0);
+ for(const path of ['/api/agents/activity','/api/admin/agents/activity','/api/admin/quality'])expect((await page.request.get(path)).status()).toBe(401);
 });
 
 test('dark theme can be changed and retained with mobile controls accessible',async({page})=>{
@@ -91,4 +94,26 @@ test('phone map stays exposed with filters and results collapsed, while desktop 
  await expect(page.getByLabel('Your food craving')).not.toBeFocused();await expect(page.getByLabel('Maximum budget')).toBeHidden();await expect(page.getByRole('button',{name:'Show results',exact:true})).toBeVisible();
  await page.screenshot({path:'test-results/phone-map-space.png'});
  await page.setViewportSize({width:1440,height:1000});await expect(page.getByLabel('Maximum budget')).toBeVisible();await expect(page.getByRole('list',{name:'Top restaurant matches'})).toBeVisible();await expect(page.getByRole('button',{name:'Show results',exact:true})).toBeHidden();
+});
+
+test('administrator operations load only after role verification and stay usable on phones',async({page})=>{
+ let roleChecked=false;
+ await page.route('**/api/me',async route=>{roleChecked=true;await route.fulfill({json:{role:'admin'}})});
+ await page.route('**/api/admin/agents/activity',async route=>{expect(roleChecked).toBeTruthy();await route.fulfill({json:{jobs:{queued:7},agents:[],notice:'Synthetic administrator fixture'}})});
+ for(const path of ['catalog/jobs','quality','claims'])await page.route('**/api/admin/'+path,route=>route.fulfill({json:[]}));
+ await page.setViewportSize({width:390,height:844});await page.goto('/admin/agents');
+ await expect(page.getByRole('heading',{name:'Collection & search operations',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Catalogue job queue'})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Administrator quality review'})).toBeVisible();
+ expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+});
+
+test('search explainer is readable on phone and tablet widths',async({page})=>{
+ await page.goto('/agents');
+ for(const width of [320,390,768]){
+  await page.setViewportSize({width,height:844});
+  await expect(page.getByRole('heading',{name:'How your search works',exact:true})).toBeVisible();
+  expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBeTruthy();
+ }
+ await page.getByRole('link',{name:'Find my food',exact:true}).click();await expect(page.getByLabel('Your food craving')).toBeVisible();
 });

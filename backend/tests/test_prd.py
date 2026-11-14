@@ -8,6 +8,26 @@ from app.agents import parse_local,Intent
 from app.saarthi import continued_intent,opening_status
 from app.database import Session,MenuItem,User,AgentRun,Campaign,CampaignPolicy,Search,Transaction
 
+def test_agent_operations_require_current_administrator_role(client):
+    paths=('/agents/activity','/admin/agents/activity')
+    for path in paths:
+        response=client.get(path)
+        assert response.status_code==401 and response.headers['cache-control']=='no-store'
+    customer=account(client,'operations-customer@example.test')
+    owner=account(client,'operations-owner@example.test','owner')
+    for auth in (customer,owner):
+        for path in paths:assert client.get(path,headers=auth).status_code==403
+    with Session() as db:
+        user=db.scalar(select(User).where(User.email=='operations-owner@example.test'));user.role='admin';db.commit()
+    for path in paths:
+        response=client.get(path,headers=owner)
+        assert response.status_code==200 and 'jobs' in response.json()
+        assert response.headers['cache-control']=='private, no-store'
+    # A previously issued session must lose access when the current role changes.
+    with Session() as db:
+        user=db.scalar(select(User).where(User.email=='operations-owner@example.test'));user.role='owner';db.commit()
+    for path in paths:assert client.get(path,headers=owner).status_code==403
+
 @pytest.mark.parametrize('case',json.loads((Path(__file__).parent/'fixtures/mumbai_queries.json').read_text()),ids=lambda c:c['query'])
 def test_golden_mumbai_queries(case):
     data=parse_local(case['query']).model_dump()
@@ -33,7 +53,9 @@ def test_verdict_stream_preserves_real_constraints_and_logs_actual_run(client):
     assert data['results'][0]['dish']['price_paise']==24000
     assert not data['results'][0]['confidence']['independently_verified']
     assert data['results'][0]['platform_links']['presence'].startswith('Not checked')
-    wall=client.get('/agents/activity').json();assert wall['agents'][0]['agent']=='Saarthi'
+    auth=account(client)
+    with Session() as db:db.scalar(select(User)).role='admin';db.commit()
+    wall=client.get('/admin/agents/activity',headers=auth).json();assert wall['agents'][0]['agent']=='Saarthi'
     assert 'query' not in json.dumps(wall['agents'])
     assert wall['agents'][0]['cost_microrupees']==0
 

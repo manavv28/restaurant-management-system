@@ -87,12 +87,14 @@ def test_failed_sources_have_cooldown_and_admin_only_recovery(client):
         job=CatalogJob(source_id=source.id,state='failed',attempts=3,error='No unambiguous INR menu items extracted',finished_at=(datetime.now(timezone.utc)-timedelta(hours=7)).isoformat(),available_at='2000')
         db.add(job);db.commit();jid=job.id
         assert schedule(db)==0
-    wall=client.get('/agents/activity').json()
-    assert wall['source_health']['failure_categories']['extraction_or_identity']==1
-    assert 'example.test' not in json.dumps(wall)
     auth=account(client)
+    assert client.get('/agents/activity').status_code==401
+    assert client.get('/admin/agents/activity',headers=auth).status_code==403
     assert client.get('/admin/catalog/jobs',headers=auth).status_code==403
     with Session() as db:db.scalar(select(User)).role='admin';db.commit()
+    wall=client.get('/admin/agents/activity',headers=auth).json()
+    assert wall['source_health']['failure_categories']['extraction_or_identity']==1
+    assert 'example.test' not in json.dumps(wall)
     assert client.post(f'/admin/catalog/jobs/{jid}/retry',headers=auth).json()['state']=='queued'
     assert client.post(f'/admin/catalog/jobs/{jid}/retry',headers=auth).status_code==409
 
