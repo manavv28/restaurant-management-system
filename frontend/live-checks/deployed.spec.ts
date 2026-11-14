@@ -41,7 +41,7 @@ test('the original noodles request respects price, radius and real-source constr
  expect(data.trace.length).toBeGreaterThan(0);
 });
 
-test('public PRD concierge serves a streamed verdict, phone map and actual Agent Wall',async({page})=>{
+test('public PRD concierge serves a streamed verdict, phone map and a public search explainer',async({page})=>{
  await expect.poll(async()=>{try{const response=await page.request.get('/manifest.webmanifest');return response.ok()?(await response.json()).start_url:'pending'}catch{return 'pending'}},{timeout:240000,intervals:[5000]}).toBe('/concierge');
  await page.goto('/concierge',{waitUntil:'domcontentloaded'});
  await expect(page.getByLabel('Interactive restaurant map')).toBeVisible();await expect(page.getByRole('button',{name:'Speak your craving'})).toBeVisible();
@@ -62,8 +62,9 @@ test('public PRD concierge serves a streamed verdict, phone map and actual Agent
  expect(resultsSheet!.y-searchBox!.y-searchBox!.height).toBeGreaterThan(844*.4);
  await page.screenshot({path:'test-results/live-prd-concierge.png'});
  await page.getByRole('link',{name:'Coverage & list view'}).click();await expect(page.getByText('Our Mumbai data collection',{exact:true})).toBeVisible();
- await page.goto('/agents');await expect(page.getByRole('heading',{name:'Meet your food crew.'})).toBeVisible();await expect(page.getByRole('heading',{name:'Catalogue job queue'})).toBeVisible();
- const response=await page.request.get('/api/agents/activity');expect(response.ok()).toBeTruthy();const data=await response.json();expect(data.agents.length).toBeGreaterThan(0);
- expect(data.agents.every((run:{agent:string;latency_ms:number})=>typeof run.agent==='string'&&run.latency_ms>=0)).toBeTruthy();
+ await page.goto('/agents');await expect(page.getByRole('heading',{name:'How your search works',exact:true})).toBeVisible();
+ await expect(page.getByRole('heading',{name:'Catalogue job queue'})).toHaveCount(0);
+ for(const path of ['/api/agents/activity','/api/admin/agents/activity'])expect((await page.request.get(path)).status()).toBe(401);
+ await page.goto('/admin/agents');await expect(page.getByRole('heading',{name:'Administrator access required'})).toBeVisible();
  await expect(page.getByRole('heading',{name:'Administrator quality review'})).toHaveCount(0);
 });

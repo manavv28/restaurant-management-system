@@ -4,7 +4,7 @@ from datetime import datetime,timedelta,timezone
 from zoneinfo import ZoneInfo
 import jwt
 from fastapi.encoders import jsonable_encoder
-from fastapi import APIRouter,Depends,HTTPException,Request
+from fastapi import APIRouter,Depends,HTTPException,Request,Response
 from starlette.responses import StreamingResponse
 from sqlalchemy import select,func,delete
 from .database import Session,User,AgentRun,CatalogJob,CatalogSource,ResearchRequest,BronzeArtifact,MenuEvidence,MenuItem,IngestionLog,now
@@ -216,8 +216,14 @@ def research_status(token:str,user=Depends(optional_user),db=Depends(db_session)
     return {'state':'completed' if terminal else 'running','succeeded':sum(j.state=='succeeded' for j in jobs),'failed':sum(j.state=='failed' for j in jobs),
             'message':'Approved source checks finished; refreshed results may still have no matching dish.' if terminal else 'Munshi is checking approved sources. Cached results remain available.'}
 
-@router.get('/agents/activity')
-def activity(db=Depends(db_session)):
+def admin(user=Depends(current_user)):
+    if user.role!='admin':raise HTTPException(403,'Administrator role required')
+    return user
+
+@router.get('/admin/agents/activity')
+@router.get('/agents/activity',include_in_schema=False)
+def activity(response:Response,user=Depends(admin),db=Depends(db_session)):
+    response.headers['Cache-Control']='private, no-store'
     jobs=db.execute(select(CatalogJob.state,func.count()).group_by(CatalogJob.state)).all()
     runs=db.scalars(select(AgentRun).order_by(AgentRun.created_at.desc()).limit(20)).all()
     latest=select(CatalogJob.source_id,func.max(CatalogJob.id).label('id')).group_by(CatalogJob.source_id).subquery()
@@ -237,9 +243,6 @@ def activity(db=Depends(db_session)):
     return {'source_health':{'alerts':alerts,'latest_failed_sources':len(failures),'failure_categories':categories,'last_successful_collection':last_success,'stalled_jobs':stalled,'retry_policy':'Transient failures: up to 3 attempts with exponential backoff. Invalid evidence, identity or access: source review and at least 24 hours cooldown. The web-service worker runs while awake; an external scheduler can run bounded batches.'},'jobs':dict(jobs),'agents':[{'id':r.id,'agent':r.agent,'state':r.status,'latency_ms':r.latency_ms,'cost_microrupees':r.cost_microrupees,'created_at':r.created_at,'execution':json.loads(r.summary).get('parser','Execution type not recorded')} for r in runs],
             'notice':'Actual recorded runs. No individual search text, account details or private platform responses are exposed.'}
 
-def admin(user=Depends(current_user)):
-    if user.role!='admin':raise HTTPException(403,'Administrator role required')
-    return user
 
 @router.get('/admin/catalog/jobs')
 def failed_jobs(user=Depends(admin),db=Depends(db_session)):

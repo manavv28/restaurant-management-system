@@ -79,7 +79,7 @@ async def browser_security(request: Request, call_next):
         return JSONResponse({'detail':'Request failed. Please try again.','request_id':request_id},status_code=500)
     response.headers['X-Request-ID']=request_id
     if response.status_code>=500:logging.error('request_error request_id=%s status=%s elapsed_ms=%d',request_id,response.status_code,int((time.monotonic()-started)*1000))
-    if request.url.path.startswith(('/auth','/me','/portal','/payments','/platforms','/admin','/partner','/research','/query','/search')):
+    if request.url.path.startswith(('/auth','/me','/portal','/payments','/platforms','/admin','/agents','/partner','/research','/query','/search')):
         response.headers.setdefault('Cache-Control','no-store')
     if request.url.path.startswith('/platforms'):response.headers['Referrer-Policy']='no-referrer'
     return response
